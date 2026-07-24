@@ -1,0 +1,245 @@
+services:
+  # ── PostgreSQL ──────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: paklawai_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-paklawai}
+      POSTGRES_USER: ${POSTGRES_USER:-paklawai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-paklawai_secret}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-paklawai} -d ${POSTGRES_DB:-paklawai}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ───────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: paklawai_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-} ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Qdrant ──────────────────────────────────────────────────
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: paklawai_qdrant
+    restart: unless-stopped
+    volumes:
+      - qdrant_data:/qdrant/storage
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: 6334
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:6333/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Backend (FastAPI) ────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    container_name: paklawai_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      QDRANT_HOST: qdrant
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-paklawai}:${POSTGRES_PASSWORD:-paklawai_secret}@postgres:5432/${POSTGRES_DB:-paklawai}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-}@redis:6379/1
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-}@redis:6379/2
+      UPLOAD_DIR: /app/uploads
+      PYTHONPATH: /app/backend:/app
+    volumes:
+      - ./backend:/app/backend
+      - ./ai:/app/ai
+      - ./workers:/app/workers
+      - ./scripts:/app/scripts:ro
+      - ./data:/app/data:ro
+      - uploads_data:/app/uploads
+      - logs_data:/app/logs
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  # ── Celery Worker (Ingestion) ────────────────────────────────
+  worker_ingestion:
+    build:
+      context: .
+      dockerfile: docker/worker.Dockerfile
+    container_name: paklawai_worker_ingestion
+    restart: unless-stopped
+    command: celery -A workers.celery_app worker -Q ingestion -c 2 --loglevel=info
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      QDRANT_HOST: qdrant
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-paklawai}:${POSTGRES_PASSWORD:-paklawai_secret}@postgres:5432/${POSTGRES_DB:-paklawai}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-}@redis:6379/1
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-}@redis:6379/2
+      UPLOAD_DIR: /app/uploads
+      PYTHONPATH: /app/backend:/app
+    volumes:
+      - ./backend:/app/backend
+      - ./ai:/app/ai
+      - ./workers:/app/workers
+      - ./data:/app/data:ro
+      - uploads_data:/app/uploads
+      - logs_data:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+
+  # ── Celery Worker (AI/Embedding) ─────────────────────────────
+  worker_ai:
+    build:
+      context: .
+      dockerfile: docker/worker.Dockerfile
+    container_name: paklawai_worker_ai
+    restart: unless-stopped
+    command: celery -A workers.celery_app worker -Q ai,embedding,report -c 1 --loglevel=info
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      QDRANT_HOST: qdrant
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-paklawai}:${POSTGRES_PASSWORD:-paklawai_secret}@postgres:5432/${POSTGRES_DB:-paklawai}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-}@redis:6379/1
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-}@redis:6379/2
+      UPLOAD_DIR: /app/uploads
+      PYTHONPATH: /app/backend:/app
+    volumes:
+      - ./backend:/app/backend
+      - ./ai:/app/ai
+      - ./workers:/app/workers
+      - uploads_data:/app/uploads
+      - logs_data:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+
+  # ── Celery Beat (Scheduler) ──────────────────────────────────
+  celery_beat:
+    build:
+      context: .
+      dockerfile: docker/worker.Dockerfile
+    container_name: paklawai_celery_beat
+    restart: unless-stopped
+    command: celery -A workers.celery_app beat --loglevel=info
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      QDRANT_HOST: qdrant
+    volumes:
+      - ./workers:/app/workers
+      - logs_data:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ── Flower (Celery Monitor) ──────────────────────────────────
+  flower:
+    build:
+      context: .
+      dockerfile: docker/worker.Dockerfile
+    container_name: paklawai_flower
+    restart: unless-stopped
+    command: celery -A workers.celery_app flower --port=5555
+    env_file:
+      - .env
+    environment:
+      REDIS_HOST: redis
+    ports:
+      - "5555:5555"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ── Frontend (Next.js) ───────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    container_name: paklawai_frontend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NEXT_PUBLIC_API_URL: http://backend:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # ── Nginx (Reverse Proxy) ────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: paklawai_nginx
+    restart: unless-stopped
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - frontend
+
+volumes:
+  postgres_data:
+  redis_data:
+  qdrant_data:
+  uploads_data:
+  logs_data:
+
+networks:
+  default:
+    name: paklawai_network

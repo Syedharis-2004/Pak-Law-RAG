@@ -1,0 +1,2 @@
+-- Schema changes are managed through Alembic.
+-- This file exists so PostgreSQL initialization has a stable, mountable entrypoint.
