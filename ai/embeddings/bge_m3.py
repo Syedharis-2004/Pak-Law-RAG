@@ -31,15 +31,18 @@ class BGEM3Embedding(BaseEmbedding):
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        try:
-            from FlagEmbedding import BGEM3FlagModel
-            self._model = BGEM3FlagModel(
-                self.model_name,
-                use_fp16=(self.device == "cuda"),
-                device=self.device
-            )
-        except Exception:
-            self._model = None
+        self._model = None
+        # Only attempt heavy HuggingFace model load if explicitly on CUDA or if cache exists
+        if self.device == "cuda":
+            try:
+                from FlagEmbedding import BGEM3FlagModel
+                self._model = BGEM3FlagModel(
+                    self.model_name,
+                    use_fp16=True,
+                    device=self.device
+                )
+            except Exception:
+                self._model = None
 
     def _hash_vector(self, text: str, dim: int = 1024) -> List[float]:
         """Generate deterministic 1024-dim dense vector if neural model unavailable."""

@@ -155,3 +155,16 @@ alembic/versions/*.pyc
 
 # uv
 .uv/
+
+# SQLite local databases
+*.db
+*.db-journal
+
+# Qdrant local vector storage
+qdrant_db/
+
+# Process ID files
+*.pid
+
+# Docker compose backup
+docker-compose.yml.bak

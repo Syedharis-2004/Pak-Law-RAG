@@ -84,9 +84,10 @@ async def seed_database():
 
         # 2. Create Roles and Assign Permissions
         logger.info("Initializing system roles & mapping RBAC matrix...")
+        from sqlalchemy.orm import selectinload
         db_roles = {}
         for role_name, allowed_perms in ROLES_MATRIX.items():
-            q = select(Role).where(Role.name == role_name)
+            q = select(Role).options(selectinload(Role.permissions)).where(Role.name == role_name)
             role = (await db.execute(q)).scalar_one_or_none()
             if not role:
                 role = Role(
@@ -98,18 +99,14 @@ async def seed_database():
                 db.add(role)
             
             # Map permissions
-            role.permissions = []
-            for perm_name in allowed_perms:
-                if perm_name in db_perms:
-                    role.permissions.append(db_perms[perm_name])
-            
+            role.permissions = [db_perms[p] for p in allowed_perms if p in db_perms]
             db_roles[role_name] = role
         await db.flush()
 
         # 3. Create Default Superuser
         logger.info("Registering default system administrator...")
         admin_email = "admin@paklaw.ai"
-        q = select(User).where(User.email == admin_email)
+        q = select(User).options(selectinload(User.roles)).where(User.email == admin_email)
         admin_user = (await db.execute(q)).scalar_one_or_none()
         
         if not admin_user:

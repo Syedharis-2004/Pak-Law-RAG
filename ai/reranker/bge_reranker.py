@@ -38,15 +38,17 @@ class BGEReranker(BaseNodePostprocessor):
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        try:
-            from FlagEmbedding import FlagReranker
-            self._reranker = FlagReranker(
-                self.model_name,
-                use_fp16=(self.device == "cuda"),
-                device=self.device
-            )
-        except Exception:
-            self._reranker = None
+        self._reranker = None
+        if self.device == "cuda":
+            try:
+                from FlagEmbedding import FlagReranker
+                self._reranker = FlagReranker(
+                    self.model_name,
+                    use_fp16=True,
+                    device=self.device
+                )
+            except Exception:
+                self._reranker = None
 
     @classmethod
     def class_name(cls) -> str:

@@ -19,18 +19,28 @@ class QdrantCollectionManager:
     """Manages Qdrant vector database collections and indexes."""
 
     def __init__(self) -> None:
+        import socket
+        qdrant_online = False
         try:
-            client = QdrantClient(
-                host=settings.QDRANT_HOST,
-                port=settings.QDRANT_PORT,
-                api_key=settings.QDRANT_API_KEY,
-                https=settings.QDRANT_HTTPS,
-                timeout=3.0,
-            )
-            client.get_collections()
-            self.client = client
+            with socket.create_connection((settings.QDRANT_HOST, settings.QDRANT_PORT), timeout=0.5):
+                qdrant_online = True
         except Exception:
-            logger.info("Remote Qdrant server unreachable; using local disk storage ./qdrant_db")
+            qdrant_online = False
+
+        if qdrant_online:
+            try:
+                client = QdrantClient(
+                    host=settings.QDRANT_HOST,
+                    port=settings.QDRANT_PORT,
+                    api_key=settings.QDRANT_API_KEY,
+                    https=settings.QDRANT_HTTPS,
+                    timeout=2.0,
+                )
+                client.get_collections()
+                self.client = client
+            except Exception:
+                self.client = QdrantClient(path="./qdrant_db")
+        else:
             self.client = QdrantClient(path="./qdrant_db")
 
 

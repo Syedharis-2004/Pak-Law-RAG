@@ -29,9 +29,10 @@ class AgentState(TypedDict):
     token: str  # For streaming output
 
 
-def _get_llm(temperature: float | None = None) -> ChatGoogleGenerativeAI:
+def _get_llm(model_name: str | None = None, temperature: float | None = None) -> ChatGoogleGenerativeAI:
+    target_model = model_name or settings.GEMINI_MODEL
     return ChatGoogleGenerativeAI(
-        model=settings.GEMINI_MODEL,
+        model=target_model,
         google_api_key=settings.GOOGLE_API_KEY,
         temperature=temperature if temperature is not None else settings.GEMINI_TEMPERATURE,
         max_tokens=settings.GEMINI_MAX_TOKENS,
@@ -39,40 +40,12 @@ def _get_llm(temperature: float | None = None) -> ChatGoogleGenerativeAI:
 
 
 async def rewrite_query(state: AgentState) -> Dict:
-    """Rewrite and expand raw query for better dense/sparse vector match."""
-    try:
-        llm = _get_llm(temperature=0.2)
-        prompt = (
-            "Optimize and expand the following Pakistani legal search query for "
-            "keyword and semantic vector matching. Maintain intent and return ONLY "
-            f"the optimized search text: {state['query']}"
-        )
-        response = await llm.ainvoke(prompt)
-        return {"rewritten_query": response.content.strip()}
-    except Exception as e:
-        logger.warning(f"Query rewriting failed, using original: {e}")
-        return {"rewritten_query": state["query"]}
+    """Pass query directly to minimize extra LLM latency roundtrips."""
+    return {"rewritten_query": state["query"].strip()}
 
 
 async def retrieve(state: AgentState) -> Dict:
-    """Run hybrid search against Qdrant. Fast-fails if Qdrant is unreachable."""
-    import socket
-
-    # Quick TCP probe — avoids loading BGE-M3 model (~500 MB) when Qdrant is down
-    qdrant_available = False
-    try:
-        sock = socket.create_connection(
-            (settings.QDRANT_HOST, settings.QDRANT_PORT), timeout=1.0
-        )
-        sock.close()
-        qdrant_available = True
-    except Exception:
-        pass
-
-    if not qdrant_available:
-        logger.info("Qdrant not reachable — skipping retrieval, using direct Gemini generation")
-        return {"retrieved_documents": []}
-
+    """Run search against Qdrant (remote or local disk) and MongoDB fallback."""
     try:
         from ai.pipelines.retrieval import HybridRetriever
         retriever = HybridRetriever()
@@ -87,7 +60,7 @@ async def retrieve(state: AgentState) -> Dict:
         )
         return {"retrieved_documents": nodes}
     except Exception as e:
-        logger.warning(f"Retrieval pipeline failed: {e}")
+        logger.warning(f"Retrieval pipeline fallback: {e}")
         return {"retrieved_documents": []}
 
 
@@ -140,26 +113,57 @@ async def generate(state: AgentState) -> Dict:
         )
         confidence = 0.75
 
-    response = await llm.ainvoke(prompt)
-    response_text = response.content
+    # Main LLM call with rate limit retry & model fallback
+    import asyncio
+    models_to_try = [settings.GEMINI_MODEL, "gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-2.0-flash-001"]
+    response_text = ""
+    last_error = None
 
-    # Generate follow-up questions
-    suggested = []
-    try:
-        suggested_prompt = (
-            "Based on the following Pakistani legal response, suggest exactly 3 short, "
-            "relevant follow-up questions a lawyer might ask next. "
-            "Return ONLY the 3 questions as a numbered list (1. 2. 3.), nothing else:\n\n"
-            f"{response_text[:1000]}"
-        )
-        suggested_res = await llm.ainvoke(suggested_prompt)
-        for line in suggested_res.content.split("\n"):
-            line = line.strip().lstrip("123.-)*").strip()
-            if line and len(line) > 10:
-                suggested.append(line)
-        suggested = suggested[:3]
-    except Exception as e:
-        logger.warning(f"Suggested questions generation failed: {e}")
+    for m in models_to_try:
+        try:
+            active_llm = _get_llm(model_name=m)
+            response = await active_llm.ainvoke(prompt)
+            response_text = response.content
+            last_error = None
+            break
+        except Exception as e:
+            last_error = e
+            if "RESOURCE_EXHAUSTED" in str(e) or "429" in str(e) or "NOT_FOUND" in str(e):
+                logger.warning(f"Model {m} returned quota error, trying fallback model...")
+                await asyncio.sleep(1)
+                continue
+            else:
+                raise e
+
+    if last_error and not response_text:
+        raise last_error
+
+    # Quick smart follow-up suggestions without extra blocking API delay
+    query_text = state['query'].lower()
+    if "constitution" in query_text or "writ" in query_text or "199" in query_text:
+        suggested = [
+            "What are the grounds for High Court jurisdiction under Article 199?",
+            "What is the difference between certiorari and mandamus writs?",
+            "What precedent cases apply to fundamental rights violation?"
+        ]
+    elif "contract" in query_text or "agreement" in query_text:
+        suggested = [
+            "What are the essential elements of a valid contract under Contract Act 1872?",
+            "What remedies exist for breach of contract in Pakistan?",
+            "How is liquidated damages defined in Pakistani law?"
+        ]
+    elif "tax" in query_text or "income" in query_text:
+        suggested = [
+            "What are the key tax appeal procedures in Income Tax Ordinance?",
+            "What penalty exists for late filing under FBR rules?",
+            "What exemptions apply to IT export services?"
+        ]
+    else:
+        suggested = [
+            "What relevant case laws or precedents apply to this legal issue?",
+            "What are the procedural steps to file a petition in court?",
+            "Which specific statute or act governs this matter?"
+        ]
 
     return {
         "response_text": response_text,

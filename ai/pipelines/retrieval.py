@@ -33,20 +33,63 @@ class HybridRetriever:
     """Executes dense + sparse search queries on Qdrant and reranks matches."""
 
     def __init__(self) -> None:
+        import socket
+        qdrant_online = False
         try:
-            client = QdrantClient(
-                host=settings.QDRANT_HOST,
-                port=settings.QDRANT_PORT,
-                api_key=settings.QDRANT_API_KEY,
-                https=settings.QDRANT_HTTPS,
-                timeout=3.0,
-            )
-            client.get_collections()
-            self.qdrant_client = client
+            with socket.create_connection((settings.QDRANT_HOST, settings.QDRANT_PORT), timeout=0.5):
+                qdrant_online = True
         except Exception:
+            qdrant_online = False
+
+        if qdrant_online:
+            try:
+                client = QdrantClient(
+                    host=settings.QDRANT_HOST,
+                    port=settings.QDRANT_PORT,
+                    api_key=settings.QDRANT_API_KEY,
+                    https=settings.QDRANT_HTTPS,
+                    timeout=2.0,
+                )
+                client.get_collections()
+                self.qdrant_client = client
+            except Exception:
+                self.qdrant_client = QdrantClient(path="./qdrant_db")
+        else:
             self.qdrant_client = QdrantClient(path="./qdrant_db")
         self.embed_model = BGEM3Embedding()
         self.reranker = BGEReranker()
+
+    def _do_search(self, collection_name: str, query_vector: Any, query_filter: Any, limit: int) -> List[Any]:
+        """Supports both QdrantClient.query_points (v1.18+) and legacy .search()."""
+        try:
+            if hasattr(self.qdrant_client, "query_points"):
+                if isinstance(query_vector, qdrant_models.NamedSparseVector):
+                    res = self.qdrant_client.query_points(
+                        collection_name=collection_name,
+                        query=query_vector.vector,
+                        using="sparse-text",
+                        query_filter=query_filter,
+                        limit=limit,
+                    )
+                else:
+                    res = self.qdrant_client.query_points(
+                        collection_name=collection_name,
+                        query=query_vector,
+                        query_filter=query_filter,
+                        limit=limit,
+                    )
+                return getattr(res, "points", res)
+            elif hasattr(self.qdrant_client, "search"):
+                return self.qdrant_client.search(
+                    collection_name=collection_name,
+                    query_vector=query_vector,
+                    query_filter=query_filter,
+                    limit=limit,
+                )
+        except Exception as e:
+            import logging
+            logging.warning(f"Qdrant search error: {e}")
+        return []
 
     async def retrieve(
         self,
@@ -71,7 +114,7 @@ class HybridRetriever:
         # ── 1. Dense Semantic Search ──────────────────────────────
         if search_type in ("semantic", "hybrid"):
             query_vector = self.embed_model.get_query_embedding(query)
-            dense_hits = self.qdrant_client.search(
+            dense_hits = self._do_search(
                 collection_name=collection_name,
                 query_vector=query_vector,
                 query_filter=qdrant_filter,
@@ -85,7 +128,7 @@ class HybridRetriever:
             indices = list(sparse_vector.keys())
             values = list(sparse_vector.values())
 
-            sparse_hits = self.qdrant_client.search(
+            sparse_hits = self._do_search(
                 collection_name=collection_name,
                 query_vector=qdrant_models.NamedSparseVector(
                     name="sparse-text",
