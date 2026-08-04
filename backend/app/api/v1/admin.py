@@ -5,12 +5,10 @@ Handles user role management, system analytics audits, and document control.
 """
 
 import uuid
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends
 
 from app.dependencies.auth import get_current_active_superuser, get_user_repository
-from app.models.user import User
 from app.repositories.user import UserRepository
 from app.schemas.auth import UserResponse
 
@@ -48,11 +46,12 @@ async def admin_assign_roles(
     user = await user_repo.get_with_roles(user_id)
     if not user:
         from app.core.exceptions import NotFoundError
+
         raise NotFoundError("User", str(user_id))
 
     # Clear current roles
     user.roles = []
-    
+
     # Resolve and assign new roles
     for role_name in roles:
         role = await user_repo.get_role_by_name(role_name)
@@ -67,20 +66,19 @@ async def admin_assign_roles(
     "/analytics/summary",
     dependencies=[Depends(get_current_active_superuser)],
 )
-async def admin_get_analytics(
-    user_repo: UserRepository = Depends(get_user_repository)
-):
+async def admin_get_analytics(user_repo: UserRepository = Depends(get_user_repository)):
     """Retrieve platform usage analytics including storage and query volumes."""
     # Run basic summary queries
-    from sqlalchemy import select, func
-    from app.models.user import User as User_Model
-    from app.models.document import Document as Doc_Model
-    from app.models.conversation import Message as Msg_Model
+    from sqlalchemy import func, select
 
-    user_count_q = select(func.count(User_Model.id)).where(User_Model.is_deleted == False)
-    doc_count_q = select(func.count(Doc_Model.id)).where(Doc_Model.is_deleted == False)
+    from app.models.conversation import Message as Msg_Model
+    from app.models.document import Document as Doc_Model
+    from app.models.user import User as User_Model
+
+    user_count_q = select(func.count(User_Model.id)).where(not User_Model.is_deleted)
+    doc_count_q = select(func.count(Doc_Model.id)).where(not Doc_Model.is_deleted)
     msg_count_q = select(func.count(Msg_Model.id))
-    storage_sum_q = select(func.sum(Doc_Model.file_size_bytes)).where(Doc_Model.is_deleted == False)
+    storage_sum_q = select(func.sum(Doc_Model.file_size_bytes)).where(not Doc_Model.is_deleted)
 
     users_total = (await user_repo.db.execute(user_count_q)).scalar_one()
     docs_total = (await user_repo.db.execute(doc_count_q)).scalar_one()

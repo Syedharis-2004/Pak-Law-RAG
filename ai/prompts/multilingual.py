@@ -22,5 +22,5 @@ MULTILINGUAL_INSTRUCTIONS = {
         "refusal": "Mujhe is sawal ka jawab dene ke liye indexed legal documents me kafi saboot nahi mil rahe hain.",
         "citation_header": "Citations / Hawala jaat:",
         "timeline_header": "Amendment Timeline:",
-    }
+    },
 }

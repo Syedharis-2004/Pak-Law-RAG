@@ -4,24 +4,29 @@ PakLaw AI — BGE Cross-Encoder Reranker
 Reranks retrieved document chunks using BAAI/bge-reranker-v2-m3.
 """
 
-from typing import Any, List
+from typing import Any
+
 try:
     from llama_index.core.postprocessor.types import BaseNodePostprocessor
     from llama_index.core.schema import NodeWithScore, QueryBundle
 except Exception:
     from pydantic import BaseModel
+
     class BaseNodePostprocessor(BaseModel):
         pass
+
     class NodeWithScore:
         def __init__(self, node=None, score=0.0):
             self.node = node
             self.score = score
+
     class QueryBundle:
         def __init__(self, query_str=""):
             self.query_str = query_str
-from pydantic import Field, PrivateAttr
+
 
 from app.core.config import settings
+from pydantic import Field, PrivateAttr
 
 
 class BGEReranker(BaseNodePostprocessor):
@@ -42,10 +47,9 @@ class BGEReranker(BaseNodePostprocessor):
         if self.device == "cuda":
             try:
                 from FlagEmbedding import FlagReranker
+
                 self._reranker = FlagReranker(
-                    self.model_name,
-                    use_fp16=True,
-                    device=self.device
+                    self.model_name, use_fp16=True, device=self.device
                 )
             except Exception:
                 self._reranker = None
@@ -56,14 +60,14 @@ class BGEReranker(BaseNodePostprocessor):
 
     def _postprocess_nodes(
         self,
-        nodes: List[NodeWithScore],
+        nodes: list[NodeWithScore],
         query_bundle: QueryBundle = None,
-    ) -> List[NodeWithScore]:
+    ) -> list[NodeWithScore]:
         if not nodes or not query_bundle:
             return nodes
 
         query = query_bundle.query_str
-        
+
         if self._reranker:
             try:
                 pairs = [[query, node.node.get_content()] for node in nodes]
@@ -73,7 +77,7 @@ class BGEReranker(BaseNodePostprocessor):
                 for idx, score in enumerate(scores):
                     nodes[idx].score = float(score)
                 sorted_nodes = sorted(nodes, key=lambda x: x.score or 0.0, reverse=True)
-                return sorted_nodes[:self.top_n]
+                return sorted_nodes[: self.top_n]
             except Exception:
                 pass
 
@@ -85,4 +89,4 @@ class BGEReranker(BaseNodePostprocessor):
             node.score = (node.score or 0.0) + (overlap * 0.1)
 
         sorted_nodes = sorted(nodes, key=lambda x: x.score or 0.0, reverse=True)
-        return sorted_nodes[:self.top_n]
+        return sorted_nodes[: self.top_n]

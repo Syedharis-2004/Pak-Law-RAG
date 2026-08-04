@@ -6,26 +6,28 @@ Handles database operations for Document, DocumentChunk, and ProcessingJob model
 
 import uuid
 from collections.abc import Sequence
-from sqlalchemy import select, and_, or_
-from sqlalchemy.orm import selectinload
 
-from app.models.document import Document, DocumentChunk, ProcessingJob, DocumentStatus
+from sqlalchemy import select
+
+from app.models.document import Document, DocumentChunk, ProcessingJob
 from app.repositories.base import BaseRepository
 
 
 class DocumentRepository(BaseRepository[Document]):
     """Document repository for managing legal documents and chunks."""
 
+    model_class = Document
+
     async def get_by_slug(self, slug: str) -> Document | None:
         """Fetch a document by its unique slug."""
-        query = select(Document).where(Document.slug == slug, Document.is_deleted == False)
+        query = select(Document).where(Document.slug == slug, not Document.is_deleted)
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
     async def get_by_checksum(self, checksum: str) -> Document | None:
         """Fetch a document by its file checksum (detect duplicates)."""
         query = select(Document).where(
-            Document.checksum_sha256 == checksum, Document.is_deleted == False
+            Document.checksum_sha256 == checksum, not Document.is_deleted
         )
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
@@ -41,7 +43,7 @@ class DocumentRepository(BaseRepository[Document]):
         search: str | None = None,
     ) -> tuple[Sequence[Document], int]:
         """Fetch, filter, and paginate documents."""
-        query = select(Document).where(Document.is_deleted == False)
+        query = select(Document).where(not Document.is_deleted)
 
         # Filters
         if user_id:
@@ -52,13 +54,13 @@ class DocumentRepository(BaseRepository[Document]):
             query = query.where(Document.is_public == is_public)
         if search:
             query = query.where(
-                Document.title.ilike(f"%{search}%")
-                | Document.description.ilike(f"%{search}%")
+                Document.title.ilike(f"%{search}%") | Document.description.ilike(f"%{search}%")
             )
 
         # Total count
         from sqlalchemy import func
-        count_query = select(func.count(Document.id)).where(Document.is_deleted == False)
+
+        count_query = select(func.count(Document.id)).where(not Document.is_deleted)
         if user_id:
             count_query = count_query.where(Document.owner_id == user_id)
         if document_type:
@@ -67,8 +69,7 @@ class DocumentRepository(BaseRepository[Document]):
             count_query = count_query.where(Document.is_public == is_public)
         if search:
             count_query = count_query.where(
-                Document.title.ilike(f"%{search}%")
-                | Document.description.ilike(f"%{search}%")
+                Document.title.ilike(f"%{search}%") | Document.description.ilike(f"%{search}%")
             )
         total_result = await self.db.execute(count_query)
         total = total_result.scalar_one()
@@ -86,9 +87,7 @@ class DocumentRepository(BaseRepository[Document]):
         await self.db.flush()
         return chunk
 
-    async def get_chunks_for_document(
-        self, document_id: uuid.UUID
-    ) -> Sequence[DocumentChunk]:
+    async def get_chunks_for_document(self, document_id: uuid.UUID) -> Sequence[DocumentChunk]:
         """Fetch all chunks belonging to a document."""
         query = (
             select(DocumentChunk)
@@ -112,9 +111,7 @@ class DocumentRepository(BaseRepository[Document]):
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
-    async def get_active_job_for_document(
-        self, document_id: uuid.UUID
-    ) -> ProcessingJob | None:
+    async def get_active_job_for_document(self, document_id: uuid.UUID) -> ProcessingJob | None:
         """Fetch the active processing job for a document."""
         query = (
             select(ProcessingJob)

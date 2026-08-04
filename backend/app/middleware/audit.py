@@ -5,15 +5,15 @@ Logs details of all modifying/sensitive HTTP requests to the audit trail databas
 """
 
 import time
-import json
+
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.types import ASGIApp
 
 from app.core.database import AsyncSessionLocal
-from app.repositories.audit import AuditRepository
-from app.models.audit import AuditLog
 from app.core.logging_config import get_logger
+from app.models.audit import AuditLog
+from app.repositories.audit import AuditRepository
 
 logger = get_logger("audit")
 
@@ -27,26 +27,24 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         start_time = time.perf_counter()
-        
+
         # Track correlation ID if provided
         request_id = request.headers.get("X-Request-ID", "unknown")
-        
+
         # Forward the request
         response = await call_next(request)
-        
+
         # Check if audit logging is required
         method = request.method
         path = request.url.path
         is_modifying = method in ("POST", "PUT", "DELETE", "PATCH")
         is_sensitive = path.startswith(("/api/v1/auth", "/api/v1/admin"))
-        
+
         if is_modifying or is_sensitive:
             duration_ms = (time.perf_counter() - start_time) * 1000
-            
+
             # Asynchronously write to audit log
             async with AsyncSessionLocal() as db:
                 try:
@@ -57,10 +55,12 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
                         try:
                             token = auth_header.split(" ")[1]
                             from app.core.security import decode_token
+
                             payload = decode_token(token)
                             user_id_str = payload.get("sub")
                             if user_id_str:
                                 import uuid
+
                                 user_id = uuid.UUID(user_id_str)
                         except Exception:
                             pass

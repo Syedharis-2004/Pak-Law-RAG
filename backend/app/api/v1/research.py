@@ -24,15 +24,14 @@ from app.services.research import ResearchService
 router = APIRouter(prefix="/research", tags=["Legal Research Mode"])
 
 
-async def get_research_repository(
-    db = Depends(get_user_repository)
-) -> ResearchRepository:
+async def get_research_repository(db=Depends(get_user_repository)) -> ResearchRepository:
     from app.models.research import ResearchReport
+
     return ResearchRepository(ResearchReport, db.db)
 
 
 async def get_research_service(
-    repo: Annotated[ResearchRepository, Depends(get_research_repository)]
+    repo: Annotated[ResearchRepository, Depends(get_research_repository)],
 ) -> ResearchService:
     return ResearchService(repo)
 
@@ -95,9 +94,9 @@ async def export_research_report(
     file_path = await research_service.export_report(
         request.report_id, request.format, current_user.id
     )
-    
+
     filename = f"PakLaw_Research_Report_{request.report_id}.{request.format.value}"
-    
+
     return FileResponse(
         path=file_path,
         filename=filename,

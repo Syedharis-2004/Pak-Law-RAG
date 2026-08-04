@@ -5,17 +5,18 @@ Sets up test database engines, initializes Alembic schema structures,
 and configures mock async database sessions and httpx clients.
 """
 
-import asyncio
 from collections.abc import AsyncGenerator
 import pytest
+import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.orm import selectinload
+from sqlalchemy import select
 
-from app.core.config import settings
 from app.core.database import Base, get_db
 from app.main import app
 
-# Use local test sqlite database in-memory/on-disk for testing fast iteration
+# Use a single in-memory SQLite DB shared across the full test session
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 test_engine = create_async_engine(
@@ -30,17 +31,11 @@ TestSessionLocal = async_sessionmaker(
 )
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create session-scoped event loop."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
+# ── Session-scoped DB setup ──────────────────────────────────────────────────
 
-
-@pytest.fixture(scope="session", autouse=True)
+@pytest_asyncio.fixture(scope="session", loop_scope="session", autouse=True)
 async def setup_test_db():
-    """Creates schemas in the test sqlite database."""
+    """Create all tables once for the whole test session, then drop them."""
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
@@ -48,56 +43,71 @@ async def setup_test_db():
         await conn.run_sync(Base.metadata.drop_all)
 
 
-@pytest.fixture
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    """Dependency injecting clean mock session."""
+    """Single async session shared across the entire test session.
+    
+    We intentionally do NOT roll back between tests so that user/role rows
+    created by one test (or fixture) are visible to the next.
+    """
     async with TestSessionLocal() as session:
         yield session
-        await session.rollback()
 
 
-@pytest.fixture
+# ── HTTP client ──────────────────────────────────────────────────────────────
+
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
-    """HTTP client linked with mock DB dependencies."""
+    """HTTPX async client wired to the app with the shared test DB session."""
     async def override_get_db():
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
-    
+
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://testserver",
     ) as ac:
         yield ac
-        
+
     app.dependency_overrides.clear()
 
 
-@pytest.fixture
+# ── Auth token fixtures ──────────────────────────────────────────────────────
+
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def user_token_headers(db_session: AsyncSession) -> dict:
+    """Create (or reuse) a citizen test user and return bearer token headers."""
     from app.models.user import User, Role
     from app.core.security import create_access_token
-    from sqlalchemy import select
-    
-    # Check/Create citizen role
-    citizen_role = (await db_session.execute(select(Role).where(Role.name == "citizen"))).scalar_one_or_none()
+
+    # Create citizen role if absent
+    citizen_role = (await db_session.execute(
+        select(Role).where(Role.name == "citizen")
+    )).scalar_one_or_none()
     if not citizen_role:
         citizen_role = Role(name="citizen", display_name="Citizen", is_system=True)
         db_session.add(citizen_role)
         await db_session.flush()
 
-    user = User(
-        email="testuser@paklaw.ai",
-        hashed_password="hashedpassword",
-        full_name="Test Citizen",
-        is_active=True,
-        is_verified=True,
-    )
-    user.roles.append(citizen_role)
-    db_session.add(user)
-    await db_session.flush()
-    await db_session.commit()
-    
+    # Reuse or create the test citizen user
+    user = (await db_session.execute(
+        select(User).where(User.email == "testcitizen@paklaw.ai")
+    )).scalar_one_or_none()
+
+    if not user:
+        user = User(
+            email="testcitizen@paklaw.ai",
+            hashed_password="hashedpassword",
+            full_name="Test Citizen",
+            is_active=True,
+            is_verified=True,
+        )
+        user.roles.append(citizen_role)
+        db_session.add(user)
+        await db_session.flush()
+        await db_session.commit()
+
     access_token = create_access_token(
         subject=str(user.id),
         extra_claims={"roles": ["citizen"], "superuser": False}
@@ -105,45 +115,64 @@ async def user_token_headers(db_session: AsyncSession) -> dict:
     return {"Authorization": f"Bearer {access_token}"}
 
 
-@pytest.fixture
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def admin_token_headers(db_session: AsyncSession) -> dict:
+    """Create (or reuse) a superuser test user and return bearer token headers."""
     from app.models.user import User, Role, Permission
     from app.core.security import create_access_token
-    from sqlalchemy import select
-    
-    # Check/Create admin role & permissions
-    admin_role = (await db_session.execute(select(Role).where(Role.name == "admin"))).scalar_one_or_none()
+
+    # Create admin role if absent
+    admin_role = (await db_session.execute(
+        select(Role).where(Role.name == "admin")
+    )).scalar_one_or_none()
     if not admin_role:
         admin_role = Role(name="admin", display_name="Admin", is_system=True)
         db_session.add(admin_role)
         await db_session.flush()
-        
-    # Seed permission to upload
-    upload_perm = (await db_session.execute(select(Permission).where(Permission.name == "documents:upload"))).scalar_one_or_none()
+
+    # Create upload permission if absent — use eager load to avoid lazy-load errors
+    upload_perm = (await db_session.execute(
+        select(Permission).where(Permission.name == "documents:upload")
+    )).scalar_one_or_none()
     if not upload_perm:
-        upload_perm = Permission(name="documents:upload", resource="documents", action="upload")
+        upload_perm = Permission(
+            name="documents:upload", resource="documents", action="upload"
+        )
         db_session.add(upload_perm)
         await db_session.flush()
-        
-    if upload_perm not in admin_role.permissions:
-        admin_role.permissions.append(upload_perm)
+
+    # Reload role with permissions eagerly to avoid MissingGreenlet on lazy access
+    role_with_perms = (await db_session.execute(
+        select(Role)
+        .where(Role.id == admin_role.id)
+        .options(selectinload(Role.permissions))
+    )).scalar_one()
+
+    if upload_perm not in role_with_perms.permissions:
+        role_with_perms.permissions.append(upload_perm)
         await db_session.flush()
 
-    user = User(
-        email="admin@paklaw.ai",
-        hashed_password="hashedpassword",
-        full_name="Test Admin",
-        is_active=True,
-        is_verified=True,
-        is_superuser=True,
-    )
-    user.roles.append(admin_role)
-    db_session.add(user)
-    await db_session.flush()
-    await db_session.commit()
-    
+    # Reuse or create the test admin user
+    admin = (await db_session.execute(
+        select(User).where(User.email == "testadmin@paklaw.ai")
+    )).scalar_one_or_none()
+
+    if not admin:
+        admin = User(
+            email="testadmin@paklaw.ai",
+            hashed_password="hashedpassword",
+            full_name="Test Admin",
+            is_active=True,
+            is_verified=True,
+            is_superuser=True,
+        )
+        admin.roles.append(admin_role)
+        db_session.add(admin)
+        await db_session.flush()
+        await db_session.commit()
+
     access_token = create_access_token(
-        subject=str(user.id),
+        subject=str(admin.id),
         extra_claims={"roles": ["admin"], "superuser": True}
     )
     return {"Authorization": f"Bearer {access_token}"}

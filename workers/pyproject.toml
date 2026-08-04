@@ -3,14 +3,14 @@ name = "paklawai-workers"
 version = "1.0.0"
 description = "PakLaw AI - Celery Background Workers"
 requires-python = ">=3.12"
-
-[project.dependencies]
-celery = {extras = ["redis"], version = "^5.4.0"}
-redis = "^5.2.1"
-sqlalchemy = {extras = ["asyncio"], version = "^2.0.36"}
-asyncpg = "^0.30.0"
-pydantic = "^2.10.3"
-pydantic-settings = "^2.7.0"
-python-dotenv = "^1.0.1"
-structlog = "^24.4.0"
-flower = "^2.0.1"
+dependencies = [
+    "celery[redis]>=5.4.0",
+    "redis>=5.2.1",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30.0",
+    "pydantic>=2.10.3",
+    "pydantic-settings>=2.7.0",
+    "python-dotenv>=1.0.1",
+    "structlog>=24.4.0",
+    "flower>=2.0.1"
+]

@@ -2,22 +2,22 @@
 Initial Schema
 
 Revision ID: 001_initial_schema
-Revises: 
+Revises:
 Create Date: 2026-06-29 12:00:00.000000
 """
 
-import uuid
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
+
 # revision identifiers, used by Alembic.
 revision: str = "001_initial_schema"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -40,8 +40,18 @@ def upgrade() -> None:
         sa.Column("api_calls_today", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("total_api_calls", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("storage_used_bytes", sa.BigInteger(), nullable=False, server_default="0"),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.Column("last_login_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("id"),
@@ -56,7 +66,12 @@ def upgrade() -> None:
         sa.Column("display_name", sa.String(length=100), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column("is_system", sa.Boolean(), nullable=False, server_default="false"),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("name"),
     )
@@ -79,7 +94,12 @@ def upgrade() -> None:
         sa.Column("resource", sa.String(length=50), nullable=False),
         sa.Column("action", sa.String(length=50), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("name"),
         sa.UniqueConstraint("resource", "action", name="uq_resource_action"),
@@ -128,8 +148,18 @@ def upgrade() -> None:
         sa.Column("qdrant_collection", sa.String(length=100), nullable=True),
         sa.Column("is_public", sa.Boolean(), nullable=False, server_default="true"),
         sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default="false"),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(["owner_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
@@ -154,11 +184,21 @@ def upgrade() -> None:
         sa.Column("char_count", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("qdrant_point_id", sa.String(length=100), nullable=True),
         sa.Column("chunk_metadata", postgresql.JSON(as_text=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["document_id"], ["documents.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(op.f("ix_document_chunks_qdrant_point_id"), "document_chunks", ["qdrant_point_id"], unique=False)
+    op.create_index(
+        op.f("ix_document_chunks_qdrant_point_id"),
+        "document_chunks",
+        ["qdrant_point_id"],
+        unique=False,
+    )
 
     # ── Table: Processing_Jobs ────────────────────────────────
     op.create_table(
@@ -174,7 +214,12 @@ def upgrade() -> None:
         sa.Column("error_traceback", sa.Text(), nullable=True),
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["document_id"], ["documents.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("celery_task_id"),
@@ -194,8 +239,18 @@ def upgrade() -> None:
         sa.Column("total_tokens_used", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("is_pinned", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default="false"),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
@@ -220,7 +275,12 @@ def upgrade() -> None:
         sa.Column("user_rating", sa.Integer(), nullable=True),
         sa.Column("user_feedback", sa.Text(), nullable=True),
         sa.Column("is_bookmarked", sa.Boolean(), nullable=False, server_default="false"),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -239,7 +299,12 @@ def upgrade() -> None:
         sa.Column("page_number", sa.Integer(), nullable=True),
         sa.Column("excerpt", sa.Text(), nullable=True),
         sa.Column("relevance_score", sa.Float(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["chunk_id"], ["document_chunks.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["document_id"], ["documents.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["message_id"], ["messages.id"], ondelete="CASCADE"),
@@ -255,7 +320,12 @@ def upgrade() -> None:
         sa.Column("title", sa.String(length=500), nullable=True),
         sa.Column("note", sa.Text(), nullable=True),
         sa.Column("tags", postgresql.JSON(as_text=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["message_id"], ["messages.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
@@ -289,14 +359,26 @@ def upgrade() -> None:
         sa.Column("docx_path", sa.String(length=1000), nullable=True),
         sa.Column("is_pinned", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default="false"),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(op.f("ix_research_reports_status"), "research_reports", ["status"], unique=False)
+    op.create_index(
+        op.f("ix_research_reports_status"), "research_reports", ["status"], unique=False
+    )
 
     # ── Table: Audit_Logs ─────────────────────────────────────
     op.create_table(
@@ -315,7 +397,12 @@ def upgrade() -> None:
         sa.Column("response_time_ms", sa.Float(), nullable=True),
         sa.Column("extra_data", postgresql.JSON(as_text=True), nullable=True),
         sa.Column("error_message", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -333,12 +420,26 @@ def upgrade() -> None:
         sa.Column("properties", postgresql.JSON(as_text=True), nullable=True),
         sa.Column("session_id", sa.String(length=100), nullable=True),
         sa.Column("ip_address", sa.String(length=45), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(op.f("ix_analytics_events_created_at"), "analytics_events", ["created_at"], unique=False)
-    op.create_index(op.f("ix_analytics_events_event_category"), "analytics_events", ["event_category"], unique=False)
-    op.create_index(op.f("ix_analytics_events_event_type"), "analytics_events", ["event_type"], unique=False)
+    op.create_index(
+        op.f("ix_analytics_events_created_at"), "analytics_events", ["created_at"], unique=False
+    )
+    op.create_index(
+        op.f("ix_analytics_events_event_category"),
+        "analytics_events",
+        ["event_category"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_analytics_events_event_type"), "analytics_events", ["event_type"], unique=False
+    )
 
 
 def downgrade() -> None:

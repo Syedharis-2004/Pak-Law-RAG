@@ -5,10 +5,12 @@ Handles user registration, login, JWT token issuance, token refresh,
 and password management.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+import uuid
+
 from jose import JWTError
 
-from app.core.exceptions import AuthenticationError, ConflictError, NotFoundError
+from app.core.exceptions import AuthenticationError, ConflictError
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -16,7 +18,6 @@ from app.core.security import (
     verify_password,
     verify_refresh_token,
 )
-from app.models.user import User
 from app.repositories.user import UserRepository
 from app.schemas.auth import (
     TokenResponse,
@@ -47,15 +48,18 @@ class AuthService:
         # Create user
         user = await self.user_repo.create(user_data)
 
-        # Assign default 'citizen' role if it exists
-        citizen_role = await self.user_repo.get_role_by_name("citizen")
-        if citizen_role:
-            user.roles.append(citizen_role)
-            await self.user_repo.db.flush()
-
         # Refetch with roles preloaded to avoid MissingGreenlet in AsyncIO
         loaded_user = await self.user_repo.get_with_roles(user.id)
-        return UserResponse.from_orm_with_roles(loaded_user or user)
+        target_user = loaded_user or user
+
+        # Assign default 'citizen' role if it exists
+        citizen_role = await self.user_repo.get_role_by_name("citizen")
+        if citizen_role and target_user:
+            target_user.roles.append(citizen_role)
+            await self.user_repo.db.flush()
+
+        return UserResponse.from_orm_with_roles(target_user)
+
 
     async def login_user(self, schema: UserLoginRequest) -> TokenResponse:
         """Authenticate user by email and password, generate JWT tokens."""
@@ -67,11 +71,15 @@ class AuthService:
             raise AuthenticationError("User account is deactivated")
 
         # Update last login
-        user.last_login_at = datetime.now(timezone.utc)
-        
+        user.last_login_at = datetime.now(UTC)
+
         # Generate tokens
         user_dict = getattr(user, "__dict__", {})
-        roles_list = [r.name for r in user_dict["roles"]] if "roles" in user_dict and user_dict["roles"] is not None else []
+        roles_list = (
+            [r.name for r in user_dict["roles"]]
+            if "roles" in user_dict and user_dict["roles"] is not None
+            else []
+        )
         access_token = create_access_token(
             subject=str(user.id),
             extra_claims={"roles": roles_list, "superuser": user.is_superuser},
@@ -100,9 +108,10 @@ class AuthService:
             raise AuthenticationError("Invalid or expired refresh token")
 
         import uuid
+
         user_id = uuid.UUID(user_id_str)
         user = await self.user_repo.get_with_roles(user_id)
-        
+
         if not user or user.refresh_token != refresh_token:
             raise AuthenticationError("Invalid refresh token")
 
@@ -111,7 +120,11 @@ class AuthService:
 
         # Generate new tokens
         user_dict = getattr(user, "__dict__", {})
-        roles_list = [r.name for r in user_dict["roles"]] if "roles" in user_dict and user_dict["roles"] is not None else []
+        roles_list = (
+            [r.name for r in user_dict["roles"]]
+            if "roles" in user_dict and user_dict["roles"] is not None
+            else []
+        )
         new_access_token = create_access_token(
             subject=str(user.id),
             extra_claims={"roles": roles_list, "superuser": user.is_superuser},

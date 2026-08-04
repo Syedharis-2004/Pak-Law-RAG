@@ -6,19 +6,22 @@ supporting environment variables and .env files.
 """
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated, Any
 
-from pydantic import AnyHttpUrl, BeforeValidator, PostgresDsn, RedisDsn, field_validator
+from pydantic import BeforeValidator, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
-from pathlib import Path
 
 def parse_cors(v: Any) -> list[str]:
     """Parse CORS origins from comma-separated string or list."""
     if isinstance(v, str):
         return [origin.strip() for origin in v.split(",")]
     return v
+
+
 BASE_DIR = Path(__file__).resolve().parents[3]
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -66,13 +69,19 @@ class Settings(BaseSettings):
     QDRANT_API_KEY: str | None = None
     QDRANT_HTTPS: bool = False
 
-    # ── Google Gemini ─────────────────────────────────────────
-    GOOGLE_API_KEY: str
-    GEMINI_MODEL: str = "gemini-2.5-pro"
+    # ── Google Gemini (legacy — kept for reference) ───────────────
+    GOOGLE_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-2.0-flash"
     GEMINI_TEMPERATURE: float = 0.1
     GEMINI_MAX_TOKENS: int = 8192
     GEMINI_TOP_P: float = 0.95
     GEMINI_TOP_K: int = 40
+
+    # ── Groq (active LLM provider) ────────────────────────────
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    GROQ_TEMPERATURE: float = 0.1
+    GROQ_MAX_TOKENS: int = 4096
 
     # ── Embedding & Reranker ──────────────────────────────────
     EMBEDDING_MODEL: str = "BAAI/bge-m3"
@@ -123,7 +132,7 @@ class Settings(BaseSettings):
     MAX_CHUNKS_PER_DOCUMENT: int = 5000
 
     # ── Retrieval ─────────────────────────────────────────────
-    RETRIEVAL_TOP_K: int = 20
+    RETRIEVAL_TOP_K: int = 10
     RERANKER_FINAL_TOP_K: int = 5
     HYBRID_SEARCH_ALPHA: float = 0.7
     CONTEXT_COMPRESSION_RATIO: float = 0.5

@@ -14,7 +14,6 @@ from app.models.conversation import Conversation, ConversationMode
 from app.repositories.conversation import ConversationRepository
 from app.schemas.chat import (
     ChatRequest,
-    CitationResponse,
     ConversationDetailResponse,
     ConversationListResponse,
     ConversationResponse,
@@ -61,9 +60,7 @@ class ChatService:
             user_id, skip=skip, limit=page_size
         )
         items = [ConversationResponse.from_orm(c) for c in convos]
-        return ConversationListResponse(
-            items=items, total=total, page=page, page_size=page_size
-        )
+        return ConversationListResponse(items=items, total=total, page=page, page_size=page_size)
 
     async def get_conversation_detail(
         self, conversation_id: uuid.UUID, user_id: uuid.UUID
@@ -91,8 +88,10 @@ class ChatService:
     ) -> AsyncGenerator[str, None]:
         """
         Stream chat response using LangGraph.
-        Yields Server-Sent Events (SSE) JSON strings.
+        Yields Server-Sent Events (SSE) JSON strings in real-time.
         """
+        import asyncio
+
         try:
             # Ensure conversation exists
             convo = await self.get_or_create_conversation(
@@ -114,13 +113,16 @@ class ChatService:
 
             # Initialize LangGraph conversational RAG graph
             from ai.graphs.chat import get_chat_graph
+
             graph = get_chat_graph()
 
             # Construct inputs for the graph
             inputs = {
                 "query": request.message,
                 "language": request.language or "en",
-                "document_ids": [str(d) for d in request.document_ids] if request.document_ids else None,
+                "document_ids": [str(d) for d in request.document_ids]
+                if request.document_ids
+                else None,
                 "conversation_id": str(convo.id),
                 "rewritten_query": "",
                 "retrieved_documents": [],
@@ -136,44 +138,74 @@ class ChatService:
             confidence_score = 0.8
             suggested_questions = []
 
-            # Stream from LangGraph — each event is a dict of {node_name: state_updates}
-            async for event in graph.astream(inputs, stream_mode="updates"):
-                # ── Citations from retrieval ──────────────────────
-                if "retrieve" in event:
-                    nodes = event["retrieve"].get("retrieved_documents", [])
-                    citations = []
-                    for idx, node_with_score in enumerate(nodes):
-                        node = getattr(node_with_score, "node", node_with_score)
-                        meta = getattr(node, "metadata", {})
-                        text = getattr(node, "text", "") or ""
-                        citations.append({
-                            "id": str(uuid.uuid4()),
-                            "citation_number": idx + 1,
-                            "document_title": meta.get("title", "Official Legal Document"),
-                            "section_number": meta.get("section_number"),
-                            "section_title": meta.get("section_title"),
-                            "page_number": meta.get("page_number"),
-                            "excerpt": text[:200],
-                            "relevance_score": float(getattr(node_with_score, "score", 0.0) or 0.0),
-                        })
-                    if citations:
-                        yield f"data: {json.dumps(StreamChunk(type='citations', citations=citations).model_dump(), default=str)}\n\n"
+            # Shared queue for both model tokens and graph event updates
+            queue = asyncio.Queue()
+            config = {"configurable": {"token_queue": queue}}
 
-                # ── Generated response ────────────────────────────
-                if "generate" in event:
-                    gen_data = event["generate"]
-                    # Full response text comes in "token" key (set by graph node)
-                    response_text = gen_data.get("token") or gen_data.get("response_text", "")
-                    if response_text:
-                        full_response_text = response_text
-                        # Stream word-by-word for smoother UX
-                        words = response_text.split(" ")
-                        for i, word in enumerate(words):
-                            token = word + (" " if i < len(words) - 1 else "")
-                            yield f"data: {json.dumps(StreamChunk(type='token', content=token).model_dump())}\n\n"
+            async def run_graph_and_queue():
+                try:
+                    async for event in graph.astream(
+                        inputs, config=config, stream_mode="updates"
+                    ):
+                        await queue.put(("event", event))
+                except Exception as e:
+                    await queue.put(("error", e))
+                    raise e
 
-                    confidence_score = gen_data.get("confidence_score", 0.8)
-                    suggested_questions = gen_data.get("suggested_questions", [])
+            # Start graph background task
+            graph_task = asyncio.create_task(run_graph_and_queue())
+
+            # Read from the queue and yield to the client
+            while not graph_task.done() or not queue.empty():
+                try:
+                    item_type, data = await asyncio.wait_for(queue.get(), timeout=0.05)
+                except asyncio.TimeoutError:
+                    continue
+
+
+                if item_type == "error":
+                    raise data
+
+                elif item_type == "token":
+                    full_response_text += data
+                    yield f"data: {json.dumps(StreamChunk(type='token', content=data).model_dump())}\n\n"
+
+                elif item_type == "event":
+                    event = data
+                    # ── Citations from retrieval ──────────────────────
+                    if "retrieve" in event:
+                        nodes = event["retrieve"].get("retrieved_documents", [])
+                        citations = []
+                        for idx, node_with_score in enumerate(nodes):
+                            node = getattr(node_with_score, "node", node_with_score)
+                            meta = getattr(node, "metadata", {})
+                            text = getattr(node, "text", "") or ""
+                            citations.append(
+                                {
+                                    "id": str(uuid.uuid4()),
+                                    "citation_number": idx + 1,
+                                    "document_title": meta.get("title", "Official Legal Document"),
+                                    "section_number": meta.get("section_number"),
+                                    "section_title": meta.get("section_title"),
+                                    "page_number": meta.get("page_number"),
+                                    "excerpt": text[:200],
+                                    "relevance_score": float(
+                                        getattr(node_with_score, "score", 0.0) or 0.0
+                                    ),
+                                }
+                            )
+                        if citations:
+                            yield f"data: {json.dumps(StreamChunk(type='citations', citations=citations).model_dump(), default=str)}\n\n"
+
+                    # ── Grab final generated metadata when node completes ────────
+                    if "generate" in event:
+                        gen_data = event["generate"]
+                        confidence_score = gen_data.get("confidence_score", 0.8)
+                        suggested_questions = gen_data.get("suggested_questions", [])
+
+            # Double check graph task exceptions
+            if graph_task.done() and graph_task.exception():
+                raise graph_task.exception()
 
             # Yield metadata (confidence + follow-up questions)
             yield f"data: {json.dumps(StreamChunk(type='metadata', confidence_score=confidence_score, suggested_questions=suggested_questions).model_dump())}\n\n"
@@ -207,15 +239,18 @@ class ChatService:
 
             # Update conversation stats
             convo.total_messages += 2
-            convo.title = request.message[:50] + "..." if len(request.message) > 50 else request.message
+            convo.title = (
+                request.message[:50] + "..." if len(request.message) > 50 else request.message
+            )
             await self.conversation_repo.db.commit()
 
             yield f"data: {json.dumps(StreamChunk(type='done', message_id=assistant_message_id).model_dump(), default=str)}\n\n"
 
         except Exception as e:
             import traceback
+
             traceback.print_exc()
-            error_msg = f"I encountered an error processing your request: {type(e).__name__}: {str(e)}"
+            error_msg = (
+                f"I encountered an error processing your request: {type(e).__name__}: {str(e)}"
+            )
             yield f"data: {json.dumps(StreamChunk(type='error', content=error_msg).model_dump(), default=str)}\n\n"
-
-

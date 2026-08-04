@@ -8,16 +8,16 @@ and RBAC verification.
 import uuid
 from typing import Annotated
 
-from fastapi import Depends, Header, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Depends
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.exceptions import AuthenticationError, AuthorizationError
 from app.core.security import verify_access_token
 from app.models.user import User
 from app.repositories.user import UserRepository
-from app.core.exceptions import AuthenticationError, AuthorizationError
 
 security = HTTPBearer()
 
@@ -33,7 +33,7 @@ async def get_current_user(
 ) -> User:
     """
     Dependency to authenticate and return the current active user from the JWT.
-    
+
     Raises:
         HTTPException: 401 if token is invalid or expired.
     """
@@ -52,7 +52,7 @@ async def get_current_user(
         raise AuthenticationError("User not found")
     if not user.is_active:
         raise AuthenticationError("User is inactive")
-        
+
     return user
 
 
@@ -72,9 +72,7 @@ class PermissionChecker:
         self.resource = resource
         self.action = action
 
-    def __call__(
-        self, current_user: Annotated[User, Depends(get_current_user)]
-    ) -> User:
+    def __call__(self, current_user: Annotated[User, Depends(get_current_user)]) -> User:
         if not current_user.has_permission(self.resource, self.action):
             raise AuthorizationError(
                 f"Required permission '{self.resource}:{self.action}' is missing"

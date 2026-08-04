@@ -6,11 +6,12 @@ in MongoDB collections so MongoDB Compass can be used to inspect all system data
 """
 
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
+
 from app.core.config import settings
-from app.core.mongodb import mongodb_manager
 from app.core.logging_config import get_logger
+from app.core.mongodb import mongodb_manager
 
 logger = get_logger("mongodb_repo")
 
@@ -36,7 +37,7 @@ class MongoDBRepository:
     """Repository helper to sync relational entity records into MongoDB collections."""
 
     @staticmethod
-    async def sync_document(doc_dict: Dict[str, Any]) -> None:
+    async def sync_document(doc_dict: dict[str, Any]) -> None:
         """Upsert document metadata into MongoDB 'documents' collection."""
         if not settings.USE_MONGODB:
             return
@@ -49,19 +50,15 @@ class MongoDBRepository:
 
             # Keep _id friendly for MongoDB Compass
             data["_id"] = doc_id
-            data["updated_at_mongo"] = datetime.now(timezone.utc).isoformat()
+            data["updated_at_mongo"] = datetime.now(UTC).isoformat()
 
-            await db.documents.update_one(
-                {"id": doc_id},
-                {"$set": data},
-                upsert=True
-            )
+            await db.documents.update_one({"id": doc_id}, {"$set": data}, upsert=True)
             logger.debug("Synced document to MongoDB", document_id=doc_id)
         except Exception as e:
             logger.warning("Failed to sync document to MongoDB", error=str(e))
 
     @staticmethod
-    async def sync_chunk(chunk_dict: Dict[str, Any]) -> None:
+    async def sync_chunk(chunk_dict: dict[str, Any]) -> None:
         """Upsert document chunk into MongoDB 'chunks' collection."""
         if not settings.USE_MONGODB:
             return
@@ -73,17 +70,13 @@ class MongoDBRepository:
                 return
 
             data["_id"] = chunk_id
-            await db.chunks.update_one(
-                {"id": chunk_id},
-                {"$set": data},
-                upsert=True
-            )
+            await db.chunks.update_one({"id": chunk_id}, {"$set": data}, upsert=True)
             logger.debug("Synced chunk to MongoDB", chunk_id=chunk_id)
         except Exception as e:
             logger.warning("Failed to sync chunk to MongoDB", error=str(e))
 
     @staticmethod
-    async def sync_user(user_dict: Dict[str, Any]) -> None:
+    async def sync_user(user_dict: dict[str, Any]) -> None:
         """Upsert user profile into MongoDB 'users' collection."""
         if not settings.USE_MONGODB:
             return
@@ -95,17 +88,13 @@ class MongoDBRepository:
                 return
 
             data["_id"] = user_id
-            await db.users.update_one(
-                {"id": user_id},
-                {"$set": data},
-                upsert=True
-            )
+            await db.users.update_one({"id": user_id}, {"$set": data}, upsert=True)
             logger.debug("Synced user to MongoDB", user_id=user_id)
         except Exception as e:
             logger.warning("Failed to sync user to MongoDB", error=str(e))
 
     @staticmethod
-    async def sync_job(job_dict: Dict[str, Any]) -> None:
+    async def sync_job(job_dict: dict[str, Any]) -> None:
         """Upsert processing job record into MongoDB 'processing_jobs' collection."""
         if not settings.USE_MONGODB:
             return
@@ -117,17 +106,13 @@ class MongoDBRepository:
                 return
 
             data["_id"] = job_id
-            await db.processing_jobs.update_one(
-                {"id": job_id},
-                {"$set": data},
-                upsert=True
-            )
+            await db.processing_jobs.update_one({"id": job_id}, {"$set": data}, upsert=True)
             logger.debug("Synced processing job to MongoDB", job_id=job_id)
         except Exception as e:
             logger.warning("Failed to sync job to MongoDB", error=str(e))
 
     @staticmethod
-    async def sync_search_log(log_dict: Dict[str, Any]) -> None:
+    async def sync_search_log(log_dict: dict[str, Any]) -> None:
         """Insert search/query log into MongoDB 'search_logs' collection."""
         if not settings.USE_MONGODB:
             return
@@ -136,16 +121,12 @@ class MongoDBRepository:
             data = _sanitize_for_mongo(log_dict)
             log_id = data.get("id", str(uuid.uuid4()))
             data["_id"] = log_id
-            await db.search_logs.update_one(
-                {"id": log_id},
-                {"$set": data},
-                upsert=True
-            )
+            await db.search_logs.update_one({"id": log_id}, {"$set": data}, upsert=True)
         except Exception as e:
             logger.warning("Failed to sync search log to MongoDB", error=str(e))
 
     @staticmethod
-    async def get_documents(limit: int = 50) -> List[Dict[str, Any]]:
+    async def get_documents(limit: int = 50) -> list[dict[str, Any]]:
         """Fetch documents stored in MongoDB collection."""
         try:
             db = mongodb_manager.get_database()
@@ -156,7 +137,7 @@ class MongoDBRepository:
             return []
 
     @staticmethod
-    async def get_chunks_by_document(document_id: str) -> List[Dict[str, Any]]:
+    async def get_chunks_by_document(document_id: str) -> list[dict[str, Any]]:
         """Fetch all chunks for a document from MongoDB collection."""
         try:
             db = mongodb_manager.get_database()

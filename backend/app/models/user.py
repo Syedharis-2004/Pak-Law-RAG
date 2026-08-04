@@ -6,16 +6,16 @@ relationships. Uses UUID primary keys and soft deletes.
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
+    Column,
     DateTime,
     ForeignKey,
     Integer,
     String,
     Table,
-    Column,
     Text,
     UniqueConstraint,
     Uuid,
@@ -25,20 +25,30 @@ from sqlalchemy.sql import func
 
 from app.core.database import Base
 
-
 # ── Association Tables ────────────────────────────────────────
 user_roles_table = Table(
     "user_roles",
     Base.metadata,
-    Column("user_id", Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
-    Column("role_id", Uuid(as_uuid=True), ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True),
+    Column(
+        "user_id", Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    ),
+    Column(
+        "role_id", Uuid(as_uuid=True), ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True
+    ),
 )
 
 role_permissions_table = Table(
     "role_permissions",
     Base.metadata,
-    Column("role_id", Uuid(as_uuid=True), ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True),
-    Column("permission_id", Uuid(as_uuid=True), ForeignKey("permissions.id", ondelete="CASCADE"), primary_key=True),
+    Column(
+        "role_id", Uuid(as_uuid=True), ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True
+    ),
+    Column(
+        "permission_id",
+        Uuid(as_uuid=True),
+        ForeignKey("permissions.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
 )
 
 
@@ -47,16 +57,12 @@ class Permission(Base):
 
     __tablename__ = "permissions"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     resource: Mapped[str] = mapped_column(String(50), nullable=False)
     action: Mapped[str] = mapped_column(String(50), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     roles: Mapped[list["Role"]] = relationship(
         "Role", secondary=role_permissions_table, back_populates="permissions"
@@ -73,16 +79,12 @@ class Role(Base):
 
     __tablename__ = "roles"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     display_name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_system: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     users: Mapped[list["User"]] = relationship(
         "User", secondary=user_roles_table, back_populates="roles"
@@ -100,9 +102,7 @@ class User(Base):
 
     __tablename__ = "users"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -124,9 +124,7 @@ class User(Base):
     total_api_calls: Mapped[int] = mapped_column(Integer, default=0)
     storage_used_bytes: Mapped[int] = mapped_column(Integer, default=0)
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
@@ -137,16 +135,16 @@ class User(Base):
     roles: Mapped[list[Role]] = relationship(
         Role, secondary=user_roles_table, back_populates="users"
     )
-    documents: Mapped[list["Document"]] = relationship(  # type: ignore[name-defined]
+    documents: Mapped[list["Document"]] = relationship(  # type: ignore[name-defined] # noqa: F821
         "Document", back_populates="owner", lazy="dynamic"
     )
-    conversations: Mapped[list["Conversation"]] = relationship(  # type: ignore[name-defined]
+    conversations: Mapped[list["Conversation"]] = relationship(  # type: ignore[name-defined] # noqa: F821
         "Conversation", back_populates="user", lazy="dynamic"
     )
-    research_reports: Mapped[list["ResearchReport"]] = relationship(  # type: ignore[name-defined]
+    research_reports: Mapped[list["ResearchReport"]] = relationship(  # type: ignore[name-defined] # noqa: F821
         "ResearchReport", back_populates="user", lazy="dynamic"
     )
-    audit_logs: Mapped[list["AuditLog"]] = relationship(  # type: ignore[name-defined]
+    audit_logs: Mapped[list["AuditLog"]] = relationship(  # type: ignore[name-defined] # noqa: F821
         "AuditLog", back_populates="user", lazy="dynamic"
     )
 

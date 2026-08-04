@@ -7,10 +7,10 @@ Handles legal document uploading, status polling, downloading, and soft deletion
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile, status
+from fastapi import APIRouter, Depends, Form, UploadFile, status
 from fastapi.responses import FileResponse
 
-from app.dependencies.auth import get_current_user, get_user_repository, PermissionChecker
+from app.dependencies.auth import PermissionChecker, get_current_user, get_user_repository
 from app.models.document import Document, DocumentType
 from app.models.user import User
 from app.repositories.document import DocumentRepository
@@ -27,16 +27,15 @@ router = APIRouter(prefix="/documents", tags=["Documents"])
 
 
 async def get_document_repository(
-    db = Depends(get_user_repository)  # Reuses base repository DB injection
+    db=Depends(get_user_repository),  # Reuses base repository DB injection
 ) -> DocumentRepository:
     # Requires active session
-    from app.core.database import get_db
     # We resolve DB session locally inside FastAPI dependency
     return DocumentRepository(Document, db.db)
 
 
 async def get_document_service(
-    doc_repo: Annotated[DocumentRepository, Depends(get_document_repository)]
+    doc_repo: Annotated[DocumentRepository, Depends(get_document_repository)],
 ) -> DocumentService:
     return DocumentService(doc_repo)
 
@@ -112,6 +111,7 @@ async def download_document(
     doc = await doc_service.get_document_file(document_id)
     if not doc.is_public and doc.owner_id != current_user.id and not current_user.is_superuser:
         from app.core.exceptions import AuthorizationError
+
         raise AuthorizationError("Cannot download documents owned by other users")
     return FileResponse(path=doc.file_path, media_type=doc.mime_type, filename=doc.file_name)
 
@@ -128,6 +128,7 @@ async def update_document(
     doc = await doc_service.get_document(document_id)
     if doc.owner_id != current_user.id and not current_user.is_superuser:
         from app.core.exceptions import AuthorizationError
+
         raise AuthorizationError("Cannot update documents owned by other users")
 
     return await doc_service.update_document(document_id, schema)
@@ -143,6 +144,7 @@ async def delete_document(
     doc = await doc_service.get_document(document_id)
     if doc.owner_id != current_user.id and not current_user.is_superuser:
         from app.core.exceptions import AuthorizationError
+
         raise AuthorizationError("Cannot delete documents owned by other users")
 
     await doc_service.delete_document(document_id)

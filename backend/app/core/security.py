@@ -5,11 +5,11 @@ JWT token creation/verification, password hashing,
 and cryptographic utilities.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from jose import JWTError, jwt
 import bcrypt
+from jose import JWTError, jwt
 
 from app.core.config import settings
 
@@ -42,13 +42,12 @@ def create_access_token(
         extra_claims: Additional claims to embed (e.g., role, org).
         expires_delta: Custom expiry. Defaults to settings value.
     """
-    expire = datetime.now(timezone.utc) + (
-        expires_delta
-        or timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(UTC) + (
+        expires_delta or timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     payload: dict[str, Any] = {
         "sub": subject,
-        "iat": datetime.now(timezone.utc),
+        "iat": datetime.now(UTC),
         "exp": expire,
         "type": "access",
     }
@@ -59,12 +58,10 @@ def create_access_token(
 
 def create_refresh_token(subject: str) -> str:
     """Create a signed JWT refresh token with longer expiry."""
-    expire = datetime.now(timezone.utc) + timedelta(
-        days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS
-    )
+    expire = datetime.now(UTC) + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
     payload: dict[str, Any] = {
         "sub": subject,
-        "iat": datetime.now(timezone.utc),
+        "iat": datetime.now(UTC),
         "exp": expire,
         "type": "refresh",
     }

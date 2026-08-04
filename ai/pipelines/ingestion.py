@@ -6,27 +6,23 @@ performs semantic chunking, embeds text using BGE-M3 (dense & sparse),
 and stores vectors in Qdrant and chunks metadata in PostgreSQL.
 """
 
-import os
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, List
 
-from docx import Document as DocxDocument
-from pypdf import PdfReader
-from PIL import Image
 import pdf2image
-
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
-from app.models.document import Document, DocumentChunk, DocumentStatus
+from app.models.document import Document, DocumentStatus
 from app.repositories.document import DocumentRepository
 from app.repositories.mongodb_repo import MongoDBRepository
+from docx import Document as DocxDocument
+from pypdf import PdfReader
+from qdrant_client.http import models as qdrant_models
+
 from ai.embeddings.bge_m3 import BGEM3Embedding
 from ai.ocr.paddleocr_engine import OCRProcessor
-from ai.utils.text_cleaning import clean_text, extract_sections_from_text
 from ai.qdrant.collections import QdrantCollectionManager
-from qdrant_client.http import models as qdrant_models
+from ai.utils.text_cleaning import clean_text, extract_sections_from_text
 
 
 class IngestionPipeline:
@@ -81,7 +77,11 @@ class IngestionPipeline:
                     job.progress_percent = 30
                     await db.commit()
                     pages_data = self._ocr_pdf_pages(doc.file_path)
-                    doc.ocr_confidence = sum(p["confidence"] for p in pages_data) / len(pages_data) if pages_data else 0.0
+                    doc.ocr_confidence = (
+                        sum(p["confidence"] for p in pages_data) / len(pages_data)
+                        if pages_data
+                        else 0.0
+                    )
 
                 # Clean text
                 for p in pages_data:
@@ -114,10 +114,12 @@ class IngestionPipeline:
                 for idx, chunk in enumerate(chunks):
                     # Generate dense and sparse vectors
                     dense_vector = self.embed_model.get_text_embedding(chunk["content"])
-                    sparse_vector = self.embed_model.get_sparse_embedding(chunk["content"])
+                    sparse_vector = self.embed_model.get_sparse_embedding(
+                        chunk["content"]
+                    )
 
                     point_id = str(uuid.uuid4())
-                    
+
                     # Create payload
                     payload = {
                         "document_id": str(doc.id),
@@ -141,10 +143,10 @@ class IngestionPipeline:
                                 "": dense_vector,
                                 "sparse-text": qdrant_models.SparseVector(
                                     indices=list(sparse_vector.keys()),
-                                    values=list(sparse_vector.values())
-                                )
+                                    values=list(sparse_vector.values()),
+                                ),
                             },
-                            payload=payload
+                            payload=payload,
                         )
                     )
 
@@ -167,8 +169,7 @@ class IngestionPipeline:
                 # Upsert points to Qdrant
                 if points:
                     self.qdrant_manager.client.upsert(
-                        collection_name=collection_name,
-                        points=points
+                        collection_name=collection_name, points=points
                     )
 
                 # Finalize Job & Document Status
@@ -203,17 +204,20 @@ class IngestionPipeline:
                     "language": doc.language,
                 }
                 await MongoDBRepository.sync_document(doc_dict)
-                await MongoDBRepository.sync_job({
-                    "id": job.id,
-                    "document_id": doc.id,
-                    "status": job.status,
-                    "progress_percent": job.progress_percent,
-                    "progress_message": job.progress_message,
-                    "completed_at": job.completed_at,
-                })
+                await MongoDBRepository.sync_job(
+                    {
+                        "id": job.id,
+                        "document_id": doc.id,
+                        "status": job.status,
+                        "progress_percent": job.progress_percent,
+                        "progress_message": job.progress_message,
+                        "completed_at": job.completed_at,
+                    }
+                )
 
             except Exception as e:
                 import traceback
+
                 error_trace = traceback.format_exc()
                 doc.status = DocumentStatus.FAILED
                 doc.processing_error = str(e)
@@ -221,9 +225,9 @@ class IngestionPipeline:
                 job.error_message = str(e)
                 job.error_traceback = error_trace
                 await db.commit()
-                raise e
+                raise
 
-    def _extract_pdf_content(self, file_path: str) -> tuple[List[dict], bool]:
+    def _extract_pdf_content(self, file_path: str) -> tuple[list[dict], bool]:
         """Extract pages from standard PDF. Flags if PDF seems scanned."""
         reader = PdfReader(file_path)
         pages_data = []
@@ -237,7 +241,7 @@ class IngestionPipeline:
         # Heuristic: If average character count per page is very low, it's likely scanned
         avg_chars = total_chars / len(reader.pages) if reader.pages else 0
         ocr_needed = avg_chars < 150
-        
+
         return pages_data, ocr_needed
 
     def _extract_docx_content(self, file_path: str) -> str:
@@ -245,7 +249,7 @@ class IngestionPipeline:
         doc = DocxDocument(file_path)
         return "\n".join([p.text for p in doc.paragraphs])
 
-    def _ocr_pdf_pages(self, file_path: str) -> List[dict]:
+    def _ocr_pdf_pages(self, file_path: str) -> list[dict]:
         """Convert PDF pages to images and run PaddleOCR."""
         pages_data = []
         try:
@@ -253,16 +257,14 @@ class IngestionPipeline:
             images = pdf2image.convert_from_path(file_path, dpi=150)
             for idx, img in enumerate(images):
                 text, confidence = self.ocr_processor.extract_text_from_pdf_page(img)
-                pages_data.append({
-                    "page_num": idx + 1,
-                    "text": text,
-                    "confidence": confidence
-                })
+                pages_data.append(
+                    {"page_num": idx + 1, "text": text, "confidence": confidence}
+                )
         except Exception as e:
-            raise RuntimeError(f"Failed converting or OCRing PDF: {str(e)}")
+            raise RuntimeError(f"Failed converting or OCRing PDF: {e!s}")
         return pages_data
 
-    def _chunk_pages(self, pages_data: List[dict]) -> List[dict]:
+    def _chunk_pages(self, pages_data: list[dict]) -> list[dict]:
         """Chunks texts using a sentence splitter strategy preserving section scope."""
         chunks = []
         # Simple sliding window chunker scoped per page/sections
@@ -277,25 +279,29 @@ class IngestionPipeline:
                 words = page_text.split()
                 chunk_size = settings.CHUNK_SIZE
                 overlap = settings.CHUNK_OVERLAP
-                
+
                 i = 0
                 while i < len(words):
-                    chunk_words = words[i:i + chunk_size]
+                    chunk_words = words[i : i + chunk_size]
                     chunk_text = " ".join(chunk_words)
-                    chunks.append({
-                        "page_number": page_num,
-                        "content": chunk_text,
-                        "section_number": None,
-                        "section_title": None,
-                    })
-                    i += (chunk_size - overlap)
+                    chunks.append(
+                        {
+                            "page_number": page_num,
+                            "content": chunk_text,
+                            "section_number": None,
+                            "section_title": None,
+                        }
+                    )
+                    i += chunk_size - overlap
             else:
                 for sec in sections:
-                    chunks.append({
-                        "page_number": page_num,
-                        "content": sec["content"],
-                        "section_number": sec["section_number"],
-                        "section_title": sec["section_title"],
-                    })
+                    chunks.append(
+                        {
+                            "page_number": page_num,
+                            "content": sec["content"],
+                            "section_number": sec["section_number"],
+                            "section_title": sec["section_title"],
+                        }
+                    )
 
         return chunks

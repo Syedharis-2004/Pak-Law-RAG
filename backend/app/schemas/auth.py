@@ -57,9 +57,9 @@ class UserResponse(BaseModel):
             roles = [r.name for r in user_dict["roles"]]
 
         data = {
-            "id": getattr(user, "id"),
-            "email": getattr(user, "email"),
-            "full_name": getattr(user, "full_name"),
+            "id": user.id,
+            "email": user.email,
+            "full_name": user.full_name,
             "organization": getattr(user, "organization", None),
             "designation": getattr(user, "designation", None),
             "preferred_language": getattr(user, "preferred_language", "en"),
@@ -67,7 +67,7 @@ class UserResponse(BaseModel):
             "is_verified": getattr(user, "is_verified", False),
             "is_superuser": getattr(user, "is_superuser", False),
             "roles": roles,
-            "created_at": getattr(user, "created_at"),
+            "created_at": user.created_at,
         }
         return cls(**data)
 

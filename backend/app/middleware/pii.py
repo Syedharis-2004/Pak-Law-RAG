@@ -6,6 +6,7 @@ phone numbers, and email addresses in outgoing responses.
 """
 
 import re
+
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.types import ASGIApp
@@ -28,14 +29,15 @@ class PIIDetectionMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         response = await call_next(request)
 
-        # Scan and clean only JSON responses to avoid disrupting file downloads
+        # Only scan plain JSON responses.
+        # IMPORTANT: SSE streams (text/event-stream) and file downloads must be
+        # returned immediately — consuming body_iterator here would buffer the
+        # entire stream in memory and break real-time token delivery.
         content_type = response.headers.get("content-type", "")
-        if "application/json" not in content_type:
+        if "application/json" not in content_type or "text/event-stream" in content_type:
             return response
 
         # Read response body
@@ -45,24 +47,25 @@ class PIIDetectionMiddleware(BaseHTTPMiddleware):
 
         try:
             text = body.decode("utf-8")
-            
+
             # Mask sensitive PII parameters
             cleaned_text = CNIC_PATTERN.sub("[CNIC_MASKED]", text)
             cleaned_text = PHONE_PATTERN.sub("[PHONE_MASKED]", cleaned_text)
             cleaned_text = EMAIL_PATTERN.sub("[EMAIL_MASKED]", cleaned_text)
-            
+
             new_body = cleaned_text.encode("utf-8")
             response.headers["content-length"] = str(len(new_body))
-            
+
             # Reconstruct response body iterator
             async def new_body_iterator():
                 yield new_body
-            
+
             response.body_iterator = new_body_iterator()
         except Exception:
             # Fallback to original body if decoding/parsing fails
             async def original_body_iterator():
                 yield body
+
             response.body_iterator = original_body_iterator()
 
         return response

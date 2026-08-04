@@ -8,8 +8,8 @@ from pathlib import Path
 # Add project root to sys.path so workers can find backend and ai modules
 sys.path.append(str(Path(__file__).parent.parent))
 
-from celery import Celery
 from app.core.config import settings
+from celery import Celery
 
 celery_app = Celery(
     "paklawai_workers",
@@ -24,20 +24,20 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="Asia/Karachi",
     enable_utc=True,
-    
     # Configure task routing queue parameters
     task_routes={
         "workers.tasks.ingestion.process_document_task": {"queue": "ingestion"},
         "workers.tasks.ingestion.delete_document_vector_task": {"queue": "ingestion"},
         "workers.tasks.report.generate_research_report_task": {"queue": "ai"},
     },
-    
     # Retry connecting to broker on startup
     broker_connection_retry_on_startup=True,
 )
 
 # Autodiscover background tasks modules
-celery_app.autodiscover_tasks([
-    "workers.tasks.ingestion",
-    "workers.tasks.report",
-])
+celery_app.autodiscover_tasks(
+    [
+        "workers.tasks.ingestion",
+        "workers.tasks.report",
+    ]
+)

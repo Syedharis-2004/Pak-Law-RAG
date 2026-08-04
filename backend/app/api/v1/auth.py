@@ -9,9 +9,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 
 from app.dependencies.auth import get_current_user, get_user_repository
+from app.models.user import User
 from app.repositories.user import UserRepository
 from app.schemas.auth import (
-    ChangePasswordRequest,
     RefreshTokenRequest,
     TokenResponse,
     UserLoginRequest,
@@ -19,20 +19,17 @@ from app.schemas.auth import (
     UserResponse,
 )
 from app.services.auth import AuthService
-from app.models.user import User
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 async def get_auth_service(
-    user_repo: Annotated[UserRepository, Depends(get_user_repository)]
+    user_repo: Annotated[UserRepository, Depends(get_user_repository)],
 ) -> AuthService:
     return AuthService(user_repo)
 
 
-@router.post(
-    "/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
-)
+@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(
     schema: UserRegisterRequest,
     auth_service: Annotated[AuthService, Depends(get_auth_service)],

@@ -12,14 +12,14 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.orm import DeclarativeBase, MappedColumn
-from sqlalchemy.pool import NullPool
+from sqlalchemy.orm import DeclarativeBase
 
 from app.core.config import settings
 
 
 class Base(DeclarativeBase):
     """Base class for all ORM models."""
+
     pass
 
 
@@ -62,9 +62,67 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def create_tables() -> None:
-    """Create all database tables (for development/testing)."""
+    """Create all database tables and seed initial system data (roles, admin)."""
+    import app.models  # noqa: F401 - ensures all ORM models are registered in Base.metadata
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    # Seed default roles and admin user if missing
+    async with AsyncSessionLocal() as session:
+        try:
+            from sqlalchemy import select
+
+            from app.core.security import hash_password
+            from app.models.user import Role, User
+
+            # 1. Seed default system roles
+            roles_data = [
+                ("citizen", "Citizen", "General public / citizen user"),
+                ("lawyer", "Lawyer", "Verified legal professional"),
+                ("student", "Law Student", "Law student / academic researcher"),
+                ("admin", "Administrator", "System administrator"),
+            ]
+            for role_name, display, desc in roles_data:
+                r = (
+                    await session.execute(select(Role).where(Role.name == role_name))
+                ).scalar_one_or_none()
+                if not r:
+                    session.add(
+                        Role(
+                            name=role_name,
+                            display_name=display,
+                            description=desc,
+                            is_system=True,
+                        )
+                    )
+            await session.flush()
+
+            # 2. Seed default admin user
+            admin_email = "admin@paklaw.ai"
+            admin = (
+                await session.execute(select(User).where(User.email == admin_email))
+            ).scalar_one_or_none()
+            if not admin:
+                admin_role = (
+                    await session.execute(select(Role).where(Role.name == "admin"))
+                ).scalar_one_or_none()
+                new_admin = User(
+                    email=admin_email,
+                    hashed_password=hash_password("Admin123!"),
+                    full_name="PakLaw System Admin",
+                    is_active=True,
+                    is_verified=True,
+                    is_superuser=True,
+                )
+                if admin_role:
+                    new_admin.roles.append(admin_role)
+                session.add(new_admin)
+
+            await session.commit()
+        except Exception:
+            await session.rollback()
+
 
 
 async def drop_tables() -> None:

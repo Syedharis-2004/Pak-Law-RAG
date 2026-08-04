@@ -8,8 +8,8 @@ deleting, metadata updating, and queuing the ingestion Celery task.
 import hashlib
 import os
 import uuid
+from datetime import UTC
 from pathlib import Path
-from typing import Any
 
 from fastapi import UploadFile
 from slugify import slugify
@@ -64,9 +64,7 @@ class DocumentService:
         # Check for duplicate
         existing_doc = await self.doc_repo.get_by_checksum(checksum)
         if existing_doc:
-            raise ConflictError(
-                f"Document already exists with title '{existing_doc.title}'"
-            )
+            raise ConflictError(f"Document already exists with title '{existing_doc.title}'")
 
         # Create upload directory
         upload_dir = Path(settings.UPLOAD_DIR)
@@ -101,7 +99,7 @@ class DocumentService:
             "checksum_sha256": checksum,
             "status": DocumentStatus.PENDING,
         }
-        document = await self.doc_repo.create(doc_in)
+        await self.doc_repo.create(doc_in)
 
         # Create processing job record
         job_id = uuid.uuid4()
@@ -119,8 +117,9 @@ class DocumentService:
 
         # Trigger background Celery worker task
         from workers.tasks.ingestion import process_document_task
+
         task = process_document_task.delay(str(doc_id), str(job_id))
-        
+
         # Save celery task ID
         job = await self.doc_repo.get_processing_job(job_id)
         if job:
@@ -168,7 +167,11 @@ class DocumentService:
             status=doc.status,
             processing_error=doc.processing_error,
             total_chunks=doc.total_chunks,
-            progress_percent=active_job.progress_percent if active_job else 100 if doc.status == DocumentStatus.READY else 0,
+            progress_percent=active_job.progress_percent
+            if active_job
+            else 100
+            if doc.status == DocumentStatus.READY
+            else 0,
             progress_message=active_job.progress_message if active_job else None,
             job_id=active_job.id if active_job else None,
             started_at=active_job.started_at if active_job else None,
@@ -197,6 +200,7 @@ class DocumentService:
 
         items = [DocumentResponse.from_orm(d) for d in docs]
         import math
+
         total_pages = math.ceil(total / page_size) if total > 0 else 0
 
         return DocumentListResponse(
@@ -226,9 +230,10 @@ class DocumentService:
             raise NotFoundError("Document", str(doc_id))
 
         # Soft delete in DB
-        from datetime import datetime, timezone
+        from datetime import datetime
+
         doc.is_deleted = True
-        doc.deleted_at = datetime.now(timezone.utc)
+        doc.deleted_at = datetime.now(UTC)
         doc.status = DocumentStatus.DELETED
         await self.doc_repo.db.flush()
 
@@ -241,4 +246,5 @@ class DocumentService:
 
         # Trigger background task to delete from Qdrant vector store
         from workers.tasks.ingestion import delete_document_vector_task
+
         delete_document_vector_task.delay(str(doc_id))

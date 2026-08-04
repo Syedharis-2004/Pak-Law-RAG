@@ -6,7 +6,8 @@ Handles database operations for Conversations, Messages, Citations, and Bookmark
 
 import uuid
 from collections.abc import Sequence
-from sqlalchemy import select, and_
+
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.models.conversation import Bookmark, Citation, Conversation, Message
@@ -16,18 +17,21 @@ from app.repositories.base import BaseRepository
 class ConversationRepository(BaseRepository[Conversation]):
     """Conversation repository for managing threads, messages, and citations."""
 
+    model_class = Conversation
+
     async def get_user_conversations(
         self, user_id: uuid.UUID, *, skip: int = 0, limit: int = 50
     ) -> tuple[Sequence[Conversation], int]:
         """Fetch all active conversations for a user with total count."""
         query = select(Conversation).where(
-            Conversation.user_id == user_id, Conversation.is_deleted == False
+            Conversation.user_id == user_id, not Conversation.is_deleted
         )
 
         # Get total count
         from sqlalchemy import func
+
         count_query = select(func.count(Conversation.id)).where(
-            Conversation.user_id == user_id, Conversation.is_deleted == False
+            Conversation.user_id == user_id, not Conversation.is_deleted
         )
         total_result = await self.db.execute(count_query)
         total = total_result.scalar_one()
@@ -45,10 +49,8 @@ class ConversationRepository(BaseRepository[Conversation]):
         """Fetch a conversation and its messages with citations."""
         query = (
             select(Conversation)
-            .where(Conversation.id == id, Conversation.is_deleted == False)
-            .options(
-                selectinload(Conversation.messages).selectinload(Message.citations)
-            )
+            .where(Conversation.id == id, not Conversation.is_deleted)
+            .options(selectinload(Conversation.messages).selectinload(Message.citations))
         )
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
@@ -64,9 +66,7 @@ class ConversationRepository(BaseRepository[Conversation]):
     async def get_message(self, message_id: uuid.UUID) -> Message | None:
         """Fetch a message by ID with its citations."""
         query = (
-            select(Message)
-            .where(Message.id == message_id)
-            .options(selectinload(Message.citations))
+            select(Message).where(Message.id == message_id).options(selectinload(Message.citations))
         )
         result = await self.db.execute(query)
         return result.scalar_one_or_none()

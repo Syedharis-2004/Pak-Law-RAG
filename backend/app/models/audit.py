@@ -8,7 +8,7 @@ and security events for compliance and monitoring.
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, JSON, String, Text, Uuid
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -52,7 +52,7 @@ class AuditLog(Base):
         DateTime(timezone=True), server_default=func.now(), index=True
     )
 
-    user: Mapped["User"] = relationship("User", back_populates="audit_logs")  # type: ignore[name-defined]
+    user: Mapped["User"] = relationship("User", back_populates="audit_logs")  # type: ignore[name-defined] # noqa: F821
 
     def __repr__(self) -> str:
         return f"<AuditLog {self.action}/{self.resource} by user={self.user_id}>"
@@ -64,9 +64,7 @@ class AnalyticsEvent(Base):
     __tablename__ = "analytics_events"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid(as_uuid=True), nullable=True, index=True
-    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True, index=True)
 
     event_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     event_category: Mapped[str] = mapped_column(String(50), nullable=False, index=True)

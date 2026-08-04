@@ -5,19 +5,20 @@ Provides motor AsyncIOMotorClient connection pooling,
 database access, index creation for collections, and ping diagnostics.
 """
 
-from typing import Optional
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+
 from app.core.config import settings
 from app.core.logging_config import get_logger
 
 logger = get_logger("mongodb")
 
+
 class MongoDBManager:
     """Manages async MongoDB client connection pool and database access."""
 
     def __init__(self) -> None:
-        self.client: Optional[AsyncIOMotorClient] = None
-        self.db: Optional[AsyncIOMotorDatabase] = None
+        self.client: AsyncIOMotorClient | None = None
+        self.db: AsyncIOMotorDatabase | None = None
 
     def get_client(self) -> AsyncIOMotorClient:
         if self.client is None:
@@ -85,7 +86,9 @@ class MongoDBManager:
             self.client = None
             self.db = None
 
+
 mongodb_manager = MongoDBManager()
+
 
 async def get_mongodb() -> AsyncIOMotorDatabase:
     """Dependency helper to return active MongoDB database."""

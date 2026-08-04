@@ -7,9 +7,10 @@ stores semantic chunks, and manages processing job states.
 
 import uuid
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
     DateTime,
@@ -18,7 +19,6 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    JSON,
     Uuid,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -27,7 +27,7 @@ from sqlalchemy.sql import func
 from app.core.database import Base
 
 
-class DocumentType(str, Enum):
+class DocumentType(StrEnum):
     ACT = "act"
     ORDINANCE = "ordinance"
     RULES = "rules"
@@ -42,7 +42,7 @@ class DocumentType(str, Enum):
     OTHER = "other"
 
 
-class DocumentStatus(str, Enum):
+class DocumentStatus(StrEnum):
     PENDING = "pending"
     PROCESSING = "processing"
     OCR = "ocr"
@@ -54,7 +54,7 @@ class DocumentStatus(str, Enum):
     DELETED = "deleted"
 
 
-class ProcessingJobStatus(str, Enum):
+class ProcessingJobStatus(StrEnum):
     QUEUED = "queued"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -126,7 +126,7 @@ class Document(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
-    owner: Mapped["User"] = relationship("User", back_populates="documents")  # type: ignore[name-defined]
+    owner: Mapped["User"] = relationship("User", back_populates="documents")  # type: ignore[name-defined] # noqa: F821
     chunks: Mapped[list["DocumentChunk"]] = relationship(
         "DocumentChunk", back_populates="document", cascade="all, delete-orphan"
     )
@@ -145,7 +145,10 @@ class DocumentChunk(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     document_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True
+        Uuid(as_uuid=True),
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
 
     # Position
@@ -185,7 +188,10 @@ class ProcessingJob(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     document_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True
+        Uuid(as_uuid=True),
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
 
     celery_task_id: Mapped[str | None] = mapped_column(String(200), nullable=True, unique=True)

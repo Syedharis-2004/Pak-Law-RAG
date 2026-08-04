@@ -4,7 +4,6 @@ PakLaw AI — Chat Pydantic Schemas
 
 import uuid
 from datetime import datetime
-from enum import Enum
 
 from pydantic import BaseModel, Field
 
@@ -78,6 +77,7 @@ class ConversationDetailResponse(BaseModel):
 
 class StreamChunk(BaseModel):
     """Server-sent event chunk for streaming responses."""
+
     type: str  # "token" | "citation" | "question" | "done" | "error"
     content: str | None = None
     citations: list[CitationResponse] | None = None

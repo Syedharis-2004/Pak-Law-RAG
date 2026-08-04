@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Sidebar from "@/components/sidebar";
 import { api } from "@/lib/api";
 import { 
@@ -52,7 +52,13 @@ export default function ResearchHubPage() {
   }, []);
 
   useEffect(() => {
+    // Cancel any in-flight poll from the previous report before starting a new one
+    if (pollTimerRef.current) {
+      clearTimeout(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
     if (activeReportId) {
+      pollAttemptsRef.current[activeReportId] = 0; // reset counter for new selection
       loadReportDetails(activeReportId);
     } else {
       setActiveReport(null);
@@ -74,20 +80,37 @@ export default function ResearchHubPage() {
     }
   };
 
+  // Track the current polling timer so we can cancel it when switching reports
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollAttemptsRef = useRef<Record<string, number>>({});
+
   const loadReportDetails = async (id: string) => {
     setLoadingActive(true);
     try {
       const res = await api.get<ResearchReport>(`/api/v1/research/reports/${id}`);
       setActiveReport(res);
-      
-      // Auto reload if generating
+
+      // Auto-poll while the report is still in-progress
       if (res.status === "queued" || res.status === "generating") {
-        setTimeout(() => {
-          if (activeReportId === id) loadReportDetails(id);
-        }, 5000);
+        const attempts = (pollAttemptsRef.current[id] ?? 0) + 1;
+        pollAttemptsRef.current[id] = attempts;
+
+        // Stop polling after ~2 minutes (60 × 2s) to avoid infinite loops
+        if (attempts < 60) {
+          if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+          // Capture `id` directly — avoids stale activeReportId closure
+          pollTimerRef.current = setTimeout(() => loadReportDetails(id), 2000);
+        }
+      } else {
+        // Report is done — reset attempt counter and clear any pending timer
+        delete pollAttemptsRef.current[id];
+        if (pollTimerRef.current) {
+          clearTimeout(pollTimerRef.current);
+          pollTimerRef.current = null;
+        }
       }
     } catch (e) {
-      // Handle error
+      // Silently ignore transient network errors during polling
     } finally {
       setLoadingActive(false);
     }

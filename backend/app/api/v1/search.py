@@ -16,15 +16,14 @@ from app.services.search import SearchService
 router = APIRouter(prefix="/search", tags=["Search Engine"])
 
 
-async def get_document_repository(
-    db = Depends(get_user_repository)
-) -> DocumentRepository:
+async def get_document_repository(db=Depends(get_user_repository)) -> DocumentRepository:
     from app.models.document import Document
+
     return DocumentRepository(Document, db.db)
 
 
 async def get_search_service(
-    repo: Annotated[DocumentRepository, Depends(get_document_repository)]
+    repo: Annotated[DocumentRepository, Depends(get_document_repository)],
 ) -> SearchService:
     return SearchService(repo)
 

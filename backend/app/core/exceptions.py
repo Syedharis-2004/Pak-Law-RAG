@@ -138,9 +138,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     """Register all custom exception handlers on the FastAPI app."""
 
     @app.exception_handler(PakLawException)
-    async def paklawai_exception_handler(
-        request: Request, exc: PakLawException
-    ) -> JSONResponse:
+    async def paklawai_exception_handler(request: Request, exc: PakLawException) -> JSONResponse:
         return JSONResponse(
             status_code=exc.status_code,
             content={
@@ -155,6 +153,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(Exception)
     async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
         import traceback
+
         traceback.print_exc()
         return JSONResponse(
             status_code=500,

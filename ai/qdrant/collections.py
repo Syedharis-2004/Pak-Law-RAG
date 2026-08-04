@@ -5,12 +5,11 @@ Handles creating, dropping, and configuring collection schemas
 for dense, sparse, and payload metadata fields.
 """
 
+from app.core.config import settings
+from app.core.logging_config import get_logger
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 from qdrant_client.http.exceptions import UnexpectedResponse
-
-from app.core.config import settings
-from app.core.logging_config import get_logger
 
 logger = get_logger("qdrant")
 
@@ -20,9 +19,12 @@ class QdrantCollectionManager:
 
     def __init__(self) -> None:
         import socket
+
         qdrant_online = False
         try:
-            with socket.create_connection((settings.QDRANT_HOST, settings.QDRANT_PORT), timeout=0.5):
+            with socket.create_connection(
+                (settings.QDRANT_HOST, settings.QDRANT_PORT), timeout=0.5
+            ):
                 qdrant_online = True
         except Exception:
             qdrant_online = False
@@ -43,7 +45,6 @@ class QdrantCollectionManager:
         else:
             self.client = QdrantClient(path="./qdrant_db")
 
-
     def init_collections(self) -> None:
         """Initialize all required vector collections with schemas."""
         collections_to_create = [
@@ -62,7 +63,7 @@ class QdrantCollectionManager:
         except (UnexpectedResponse, Exception):
             # Create collection
             logger.info("Creating Qdrant collection", collection=collection_name)
-            
+
             # Configure collection options
             self.client.create_collection(
                 collection_name=collection_name,
@@ -99,7 +100,7 @@ class QdrantCollectionManager:
                 field_name=field_name,
                 field_schema=schema_type,
             )
-            
+
         logger.info("Payload indexes initialized", collection=collection_name)
 
     def drop_collection(self, collection_name: str) -> None:
@@ -108,4 +109,6 @@ class QdrantCollectionManager:
             self.client.delete_collection(collection_name)
             logger.info("Dropped collection", collection=collection_name)
         except Exception as e:
-            logger.error("Failed to drop collection", collection=collection_name, error=str(e))
+            logger.error(
+                "Failed to drop collection", collection=collection_name, error=str(e)
+            )

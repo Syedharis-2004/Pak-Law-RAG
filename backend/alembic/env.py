@@ -15,18 +15,17 @@ if config.config_file_name is not None:
 
 # ── Load models metadata ─────────────────────────────────────
 from app.core.database import Base
+
 # Import all models to ensure they register on Base.metadata
-from app.models.user import User, Role, Permission
-from app.models.document import Document, DocumentChunk, ProcessingJob
-from app.models.conversation import Conversation, Message, Citation, Bookmark
-from app.models.research import ResearchReport
-from app.models.audit import AuditLog, AnalyticsEvent
 
 target_metadata = Base.metadata
 
 # Read sync database URL from env settings
 from app.core.config import settings
-config.set_main_option("sqlalchemy.url", settings.SYNC_DATABASE_URL or settings.DATABASE_URL.replace("+asyncpg", ""))
+
+config.set_main_option(
+    "sqlalchemy.url", settings.SYNC_DATABASE_URL or settings.DATABASE_URL.replace("+asyncpg", "")
+)
 
 
 def run_migrations_offline() -> None:

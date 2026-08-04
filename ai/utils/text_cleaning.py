@@ -33,7 +33,7 @@ def extract_sections_from_text(text: str) -> list[dict]:
     """
     sections = []
     lines = text.split("\n")
-    
+
     # Section pattern: 'Section 4' or '4.' or 'SECTION 4A'
     pattern = re.compile(r"^\s*(?:Section|SECTION)\s*([0-9A-Za-z]+)\.?\s*(.*)$")
     alternative_pattern = re.compile(r"^\s*([0-9]+)\.?\s+([A-Z][a-zA-Z\s,]{3,50})$")
@@ -47,13 +47,15 @@ def extract_sections_from_text(text: str) -> list[dict]:
         if match:
             # Save previous section if it exists
             if current_section_num and section_buffer:
-                sections.append({
-                    "section_number": current_section_num,
-                    "section_title": current_section_title,
-                    "content": "\n".join(section_buffer).strip()
-                })
+                sections.append(
+                    {
+                        "section_number": current_section_num,
+                        "section_title": current_section_title,
+                        "content": "\n".join(section_buffer).strip(),
+                    }
+                )
                 section_buffer = []
-            
+
             current_section_num = match.group(1).strip()
             current_section_title = match.group(2).strip() or None
         else:
@@ -61,10 +63,12 @@ def extract_sections_from_text(text: str) -> list[dict]:
 
     # Append remaining
     if current_section_num and section_buffer:
-        sections.append({
-            "section_number": current_section_num,
-            "section_title": current_section_title,
-            "content": "\n".join(section_buffer).strip()
-        })
+        sections.append(
+            {
+                "section_number": current_section_num,
+                "section_title": current_section_title,
+                "content": "\n".join(section_buffer).strip(),
+            }
+        )
 
     return sections

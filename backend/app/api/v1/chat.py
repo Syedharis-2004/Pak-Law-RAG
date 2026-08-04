@@ -25,15 +25,14 @@ from app.services.chat import ChatService
 router = APIRouter(prefix="/chat", tags=["Conversational AI"])
 
 
-async def get_conversation_repository(
-    db = Depends(get_user_repository)
-) -> ConversationRepository:
+async def get_conversation_repository(db=Depends(get_user_repository)) -> ConversationRepository:
     from app.models.conversation import Conversation
+
     return ConversationRepository(Conversation, db.db)
 
 
 async def get_chat_service(
-    repo: Annotated[ConversationRepository, Depends(get_conversation_repository)]
+    repo: Annotated[ConversationRepository, Depends(get_conversation_repository)],
 ) -> ChatService:
     return ChatService(repo)
 
@@ -58,7 +57,7 @@ async def chat_query(
                 "X-Accel-Buffering": "no",
             },
         )
-    
+
     # Synchronous query helper (uses streaming generator internally and formats response)
     chunks = []
     async for chunk in chat_service.stream_chat(request, current_user.id):
@@ -129,6 +128,7 @@ async def remove_bookmark(
     success = await chat_service.conversation_repo.remove_bookmark(current_user.id, message_id)
     if not success:
         from app.core.exceptions import NotFoundError
+
         raise NotFoundError("Bookmark for message", str(message_id))
 
 
@@ -142,8 +142,9 @@ async def submit_feedback(
     msg = await chat_service.conversation_repo.get_message(request.message_id)
     if not msg:
         from app.core.exceptions import NotFoundError
+
         raise NotFoundError("Message", str(request.message_id))
-    
+
     msg.user_rating = request.rating
     msg.user_feedback = request.feedback
     await chat_service.conversation_repo.db.flush()

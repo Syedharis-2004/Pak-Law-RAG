@@ -7,12 +7,13 @@ updating the PostgreSQL database.
 
 import asyncio
 from datetime import datetime, timezone
-from celery.utils.log import get_task_logger
 
-from workers.celery_app import celery_app
 from app.core.database import AsyncSessionLocal
 from app.models.research import ReportStatus, ResearchReport
 from app.repositories.research import ResearchRepository
+from celery.utils.log import get_task_logger
+
+from workers.celery_app import celery_app
 
 logger = get_task_logger(__name__)
 
@@ -41,6 +42,7 @@ def generate_research_report_task(
     async def _run():
         async with AsyncSessionLocal() as db:
             import uuid
+
             repo = ResearchRepository(ResearchReport, db)
             report = await repo.get(uuid.UUID(report_id))
 
@@ -55,6 +57,7 @@ def generate_research_report_task(
 
                 # Invoke LangGraph Research workflow
                 from ai.graphs.legal_research import get_research_graph
+
                 graph = get_research_graph()
 
                 inputs = {
@@ -69,9 +72,11 @@ def generate_research_report_task(
                 result = await graph.ainvoke(inputs)
 
                 report_json = result.get("report_json", {})
-                
+
                 # Update report content fields
-                report.title = report_json.get("title", f"Legal Research Report - {query[:30]}")
+                report.title = report_json.get(
+                    "title", f"Legal Research Report - {query[:30]}"
+                )
                 report.executive_summary = report_json.get("executive_summary")
                 report.legal_issues = report_json.get("legal_issues")
                 report.applicable_laws = report_json.get("applicable_laws")
@@ -85,9 +90,13 @@ def generate_research_report_task(
                 report.confidence_score = 0.95
                 report.documents_searched = len(document_ids) if document_ids else 5
                 report.sections_retrieved = len(result.get("retrieved_sections", []))
-                
+
                 # Generate default PDF export and DOCX export
-                from ai.utils.pdf_generator import generate_pdf_report, generate_docx_report
+                from ai.utils.pdf_generator import (
+                    generate_docx_report,
+                    generate_pdf_report,
+                )
+
                 pdf_path = generate_pdf_report(report)
                 docx_path = generate_docx_report(report)
 
@@ -98,7 +107,7 @@ def generate_research_report_task(
                 await db.commit()
 
             except Exception as e:
-                logger.error(f"Report generation task failed: {str(e)}")
+                logger.error(f"Report generation task failed: {e!s}")
                 report.status = ReportStatus.FAILED
                 report.error_message = str(e)
                 await db.commit()
@@ -106,5 +115,5 @@ def generate_research_report_task(
     try:
         loop.run_until_complete(_run())
         return "SUCCESS"
-    except Exception as e:
+    except Exception:
         return "FAILED"

@@ -7,15 +7,15 @@ and user bookmarks with full conversation memory support.
 
 import uuid
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     DateTime,
     Float,
     ForeignKey,
     Integer,
-    JSON,
     String,
     Text,
     Uuid,
@@ -26,13 +26,13 @@ from sqlalchemy.sql import func
 from app.core.database import Base
 
 
-class MessageRole(str, Enum):
+class MessageRole(StrEnum):
     USER = "user"
     ASSISTANT = "assistant"
     SYSTEM = "system"
 
 
-class ConversationMode(str, Enum):
+class ConversationMode(StrEnum):
     CHAT = "chat"
     RESEARCH = "research"
     CONTRACT_REVIEW = "contract_review"
@@ -71,7 +71,7 @@ class Conversation(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
-    user: Mapped["User"] = relationship("User", back_populates="conversations")  # type: ignore[name-defined]
+    user: Mapped["User"] = relationship("User", back_populates="conversations")  # type: ignore[name-defined] # noqa: F821
     messages: Mapped[list["Message"]] = relationship(
         "Message",
         back_populates="conversation",

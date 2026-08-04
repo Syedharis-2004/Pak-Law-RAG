@@ -6,9 +6,9 @@ Provides generic CRUD operations for SQLAlchemy models.
 
 import uuid
 from collections.abc import Sequence
-from typing import Generic, TypeVar
+from typing import TypeVar
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import Base
@@ -16,12 +16,26 @@ from app.core.database import Base
 ModelType = TypeVar("ModelType", bound=Base)
 
 
-class BaseRepository(Generic[ModelType]):
+class BaseRepository[ModelType: Base]:
     """Base repository class with generic async CRUD operations."""
 
-    def __init__(self, model: type[ModelType], db: AsyncSession) -> None:
-        self.model = model
-        self.db = db
+    model_class: type[ModelType] | None = None
+
+    def __init__(
+        self, model_or_db: type[ModelType] | AsyncSession, db: AsyncSession | None = None
+    ) -> None:
+        if db is not None:
+            self.model = model_or_db  # type: ignore[assignment]
+            self.db = db
+        elif isinstance(model_or_db, AsyncSession):
+            if self.model_class is not None:
+                self.model = self.model_class
+            else:
+                raise ValueError("Model not provided for repository")
+            self.db = model_or_db
+        else:
+            raise ValueError("AsyncSession must be provided")
+
 
     async def get(self, id: uuid.UUID) -> ModelType | None:
         """Fetch a record by its UUID."""
@@ -29,9 +43,7 @@ class BaseRepository(Generic[ModelType]):
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
-    async def get_multi(
-        self, *, skip: int = 0, limit: int = 100
-    ) -> Sequence[ModelType]:
+    async def get_multi(self, *, skip: int = 0, limit: int = 100) -> Sequence[ModelType]:
         """Fetch multiple records with pagination."""
         query = select(self.model).offset(skip).limit(limit)
         result = await self.db.execute(query)

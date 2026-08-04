@@ -28,10 +28,12 @@ class SearchService:
 
         # Detect query language
         from ai.utils.language_detection import detect_language
+
         lang = detect_language(request.query)
 
         # 1. Initialize Hybrid Retrieval pipeline
         from ai.pipelines.retrieval import HybridRetriever
+
         retriever = HybridRetriever()
 
         # Formulate filters
