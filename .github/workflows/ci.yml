@@ -51,6 +51,13 @@ jobs:
   test-backend:
     name: Backend Tests
     runs-on: ubuntu-latest
+    # Job-level env vars ensure all steps (fixtures, plugins) see the same DB config
+    env:
+      DATABASE_URL: postgresql+asyncpg://paklawai:test_password@localhost:5432/paklawai_test
+      REDIS_URL: redis://localhost:6379/0
+      APP_SECRET_KEY: test-secret-key-for-ci
+      JWT_SECRET_KEY: test-jwt-secret-for-ci
+      GOOGLE_API_KEY: dummy-key-for-unit-tests
     services:
       postgres:
         image: postgres:16-alpine
@@ -81,18 +88,23 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         run: |
-          pip install uv
-          uv pip install --system -e "backend/[test]"
+          python -m pip install --upgrade pip
+          python -m pip install -e "backend[test]"
+          python -m pip install pytest pytest-asyncio pytest-cov
+      - name: Wait for Postgres
+        run: |
+          for i in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432; then
+              echo "Postgres is ready"
+              break
+            fi
+            echo "Waiting for Postgres... ($i/30)"
+            sleep 1
+          done
       - name: Run tests
-        env:
-          DATABASE_URL: postgresql+asyncpg://paklawai:test_password@localhost:5432/paklawai_test
-          REDIS_URL: redis://localhost:6379/0
-          APP_SECRET_KEY: test-secret-key-for-ci
-          JWT_SECRET_KEY: test-jwt-secret-for-ci
-          GOOGLE_API_KEY: dummy-key-for-unit-tests
         run: |
           cd backend
-          python -m pytest tests/ -v --cov=app --cov-report=xml --cov-report=term
+          python -m pytest ./tests -v --cov=app --cov-report=xml --cov-report=term
       - name: Upload coverage
         uses: codecov/codecov-action@v4
         with:
