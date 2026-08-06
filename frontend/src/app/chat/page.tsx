@@ -146,7 +146,7 @@ export default function ChatPage() {
           document_ids: selectedDocIds.length > 0 ? selectedDocIds : undefined,
           stream: true,
         },
-        (chunk) => {
+        (chunk: any) => {
           if (chunk.type === "citations") {
             assistantMsg.citations = chunk.citations;
             setMessages((prev) =>
