@@ -114,9 +114,7 @@ class IngestionPipeline:
                 for idx, chunk in enumerate(chunks):
                     # Generate dense and sparse vectors
                     dense_vector = self.embed_model.get_text_embedding(chunk["content"])
-                    sparse_vector = self.embed_model.get_sparse_embedding(
-                        chunk["content"]
-                    )
+                    sparse_vector = self.embed_model.get_sparse_embedding(chunk["content"])
 
                     point_id = str(uuid.uuid4())
 
@@ -257,9 +255,7 @@ class IngestionPipeline:
             images = pdf2image.convert_from_path(file_path, dpi=150)
             for idx, img in enumerate(images):
                 text, confidence = self.ocr_processor.extract_text_from_pdf_page(img)
-                pages_data.append(
-                    {"page_num": idx + 1, "text": text, "confidence": confidence}
-                )
+                pages_data.append({"page_num": idx + 1, "text": text, "confidence": confidence})
         except Exception as e:
             raise RuntimeError(f"Failed converting or OCRing PDF: {e!s}") from e
         return pages_data

@@ -49,9 +49,7 @@ class BGEReranker(BaseNodePostprocessor):
             try:
                 from FlagEmbedding import FlagReranker
 
-                self._reranker = FlagReranker(
-                    self.model_name, use_fp16=True, device=self.device
-                )
+                self._reranker = FlagReranker(self.model_name, use_fp16=True, device=self.device)
             except Exception:  # noqa: BLE001 — optional GPU model, swallow all load errors
                 self._reranker = None
 

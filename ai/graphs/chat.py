@@ -28,6 +28,7 @@ def _get_retriever():
     if _retriever_instance is None:
         try:
             from ai.pipelines.retrieval import HybridRetriever
+
             _retriever_instance = HybridRetriever()
         except Exception as e:
             logger.warning(f"HybridRetriever init failed, retrieval disabled: {e}")
@@ -116,9 +117,7 @@ async def generate(state: AgentState, config: RunnableConfig = None) -> dict:
         for doc in retrieved_docs:
             node = getattr(doc, "node", doc)
             meta = getattr(node, "metadata", {})
-            text = (
-                getattr(node, "text", "") or getattr(node, "get_content", lambda: "")()
-            )
+            text = getattr(node, "text", "") or getattr(node, "get_content", lambda: "")()
             context_list.append(
                 f"Doc: {meta.get('title', 'Legal Document')} "
                 f"(Section: {meta.get('section_number', 'N/A')}, "
@@ -163,10 +162,10 @@ async def generate(state: AgentState, config: RunnableConfig = None) -> dict:
 
     # Groq model fallback chain (fast → lightweight)
     models_to_try = [
-        settings.GROQ_MODEL,          # llama-3.3-70b-versatile (primary)
-        "llama-3.1-8b-instant",       # fast fallback
-        "mixtral-8x7b-32768",         # broad context fallback
-        "gemma2-9b-it",               # last resort
+        settings.GROQ_MODEL,  # llama-3.3-70b-versatile (primary)
+        "llama-3.1-8b-instant",  # fast fallback
+        "mixtral-8x7b-32768",  # broad context fallback
+        "gemma2-9b-it",  # last resort
     ]
     response_text = ""
     last_error = None
@@ -184,14 +183,8 @@ async def generate(state: AgentState, config: RunnableConfig = None) -> dict:
             break
         except Exception as e:
             last_error = e
-            if (
-                "RESOURCE_EXHAUSTED" in str(e)
-                or "429" in str(e)
-                or "NOT_FOUND" in str(e)
-            ):
-                logger.warning(
-                    f"Model {m} returned quota error, trying fallback model..."
-                )
+            if "RESOURCE_EXHAUSTED" in str(e) or "429" in str(e) or "NOT_FOUND" in str(e):
+                logger.warning(f"Model {m} returned quota error, trying fallback model...")
                 await asyncio.sleep(0.1)  # Faster fallback transition
                 continue
             else:

@@ -31,9 +31,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         import sys
 
         path = request.url.path
-        if "pytest" in sys.modules or path.startswith(("/docs", "/redoc", "/openapi.json", "/health")):
+        if "pytest" in sys.modules or path.startswith(
+            ("/docs", "/redoc", "/openapi.json", "/health")
+        ):
             return await call_next(request)
-
 
         # Identify client (IP or User ID if authenticated)
         client_ip = request.client.host if request.client else "unknown"

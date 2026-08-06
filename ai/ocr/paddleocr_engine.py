@@ -62,9 +62,7 @@ class OCRProcessor:
                 confidence_scores.append(confidence)
 
             full_text = "\n".join(text_lines)
-            avg_confidence = (
-                float(np.mean(confidence_scores)) if confidence_scores else 0.0
-            )
+            avg_confidence = float(np.mean(confidence_scores)) if confidence_scores else 0.0
 
             return full_text, avg_confidence
 
@@ -72,9 +70,7 @@ class OCRProcessor:
             logger.error("PaddleOCR execution failed", error=str(e), path=image_path)
             raise
 
-    def extract_text_from_pdf_page(
-        self, pdf_page_image: Image.Image
-    ) -> tuple[str, float]:
+    def extract_text_from_pdf_page(self, pdf_page_image: Image.Image) -> tuple[str, float]:
         """
         Processes an in-memory PIL Image representing a single PDF page.
         """

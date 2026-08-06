@@ -110,6 +110,4 @@ class QdrantCollectionManager:
             self.client.delete_collection(collection_name)
             logger.info("Dropped collection", collection=collection_name)
         except Exception as e:
-            logger.error(
-                "Failed to drop collection", collection=collection_name, error=str(e)
-            )
+            logger.error("Failed to drop collection", collection=collection_name, error=str(e))

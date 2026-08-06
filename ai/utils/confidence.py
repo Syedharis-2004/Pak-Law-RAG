@@ -7,9 +7,7 @@ Calculates a score based on context relevance and token match statistics.
 from llama_index.core.schema import NodeWithScore
 
 
-def calculate_confidence_score(
-    retrieved_nodes: list[NodeWithScore], response_text: str
-) -> float:
+def calculate_confidence_score(retrieved_nodes: list[NodeWithScore], response_text: str) -> float:
     """
     Calculate confidence score (0.0 to 1.0) for the generated response.
     Combines vector retrieval similarity scores with citation matching statistics.
@@ -18,9 +16,7 @@ def calculate_confidence_score(
         return 0.0
 
     # 1. Average similarity score of top retrieval nodes
-    avg_retrieval_score = sum(node.score or 0.0 for node in retrieved_nodes) / len(
-        retrieved_nodes
-    )
+    avg_retrieval_score = sum(node.score or 0.0 for node in retrieved_nodes) / len(retrieved_nodes)
 
     # Normalize score (sometimes Cosine or Dot Product is above/below 0-1 depending on model)
     avg_retrieval_score = max(0.0, min(1.0, avg_retrieval_score))
@@ -34,9 +30,7 @@ def calculate_confidence_score(
     if not response_words:
         return round(avg_retrieval_score, 2)
 
-    context_text = " ".join(
-        [node.node.get_content().lower() for node in retrieved_nodes]
-    )
+    context_text = " ".join([node.node.get_content().lower() for node in retrieved_nodes])
     matched_words = sum(1 for w in response_words if w in context_text)
     overlap_ratio = matched_words / len(response_words)
 

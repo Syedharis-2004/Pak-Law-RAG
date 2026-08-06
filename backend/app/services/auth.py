@@ -60,7 +60,6 @@ class AuthService:
 
         return UserResponse.from_orm_with_roles(target_user)
 
-
     async def login_user(self, schema: UserLoginRequest) -> TokenResponse:
         """Authenticate user by email and password, generate JWT tokens."""
         user = await self.user_repo.get_by_email(schema.email)

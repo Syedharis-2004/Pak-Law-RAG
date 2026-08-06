@@ -55,6 +55,7 @@ async def lifespan(app: FastAPI):
     async def _warm_retriever():
         try:
             from ai.graphs.chat import _get_retriever
+
             await asyncio.to_thread(_get_retriever)
             logger.info("HybridRetriever pre-warmed successfully.")
         except Exception as e:
@@ -63,6 +64,7 @@ async def lifespan(app: FastAPI):
     async def _warm_chat_graph():
         try:
             from ai.graphs.chat import get_chat_graph
+
             get_chat_graph()
             logger.info("LangGraph chat graph pre-compiled and cached.")
         except Exception as e:

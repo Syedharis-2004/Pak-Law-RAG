@@ -140,7 +140,6 @@ class ResearchService:
                 pdf_path = await asyncio.to_thread(generate_pdf_report, report)
                 docx_path = await asyncio.to_thread(generate_docx_report, report)
 
-
                 report.pdf_path = pdf_path
                 report.docx_path = docx_path
                 report.status = ReportStatus.COMPLETED
@@ -152,7 +151,6 @@ class ResearchService:
                 report.status = ReportStatus.FAILED
                 report.error_message = str(e)
                 await db.commit()
-
 
     async def get_report(self, report_id: uuid.UUID, user_id: uuid.UUID) -> ResearchReportResponse:
         """Fetch a specific research report."""

@@ -26,6 +26,7 @@ def _get_retriever():
     if _retriever_instance is None:
         try:
             from ai.pipelines.retrieval import HybridRetriever
+
             _retriever_instance = HybridRetriever()
             logger.info("HybridRetriever singleton initialised for research graph.")
         except Exception as e:
@@ -82,11 +83,7 @@ async def generate_report(state: ResearchState) -> dict:
     for nws in state.get("retrieved_sections", []):
         node = getattr(nws, "node", nws)
         meta = getattr(node, "metadata", {}) or {}
-        text = (
-            getattr(node, "text", "")
-            or getattr(node, "get_content", lambda: "")()
-            or ""
-        )
+        text = getattr(node, "text", "") or getattr(node, "get_content", lambda: "")() or ""
         context_list.append(
             f"Statute: {meta.get('title', 'Legal Document')} | "
             f"Section: {meta.get('section_number', 'N/A')} - "
@@ -145,8 +142,7 @@ Write for Pakistani law practitioners. Do not include the raw JSON in the Markdo
         report_json = {
             "title": f"Legal Research Report — {state['query'][:60]}",
             "executive_summary": (
-                json_part[:500] if json_part
-                else "Report generation encountered a parsing issue."
+                json_part[:500] if json_part else "Report generation encountered a parsing issue."
             ),
             "legal_issues": [],
             "applicable_laws": [],
@@ -161,9 +157,7 @@ Write for Pakistani law practitioners. Do not include the raw JSON in the Markdo
         markdown_text = (
             f"# {report_json.get('title', 'Legal Research Report')}\n\n"
             f"## Executive Summary\n\n{report_json.get('executive_summary', '')}\n\n"
-            + "\n\n".join(
-                f"- {rec}" for rec in report_json.get("recommendations", [])
-            )
+            + "\n\n".join(f"- {rec}" for rec in report_json.get("recommendations", []))
         )
 
     return {"report_json": report_json, "report_markdown": markdown_text}

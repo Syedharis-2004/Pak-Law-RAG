@@ -14,17 +14,13 @@ from workers.celery_app import celery_app
 logger = get_task_logger(__name__)
 
 
-@celery_app.task(
-    name="workers.tasks.ingestion.process_document_task", bind=True, max_retries=3
-)
+@celery_app.task(name="workers.tasks.ingestion.process_document_task", bind=True, max_retries=3)
 def process_document_task(self, document_id: str, job_id: str) -> str:
     """
     Background worker task invoking the ingestion pipeline.
     Runs asynchronously on file uploads.
     """
-    logger.info(
-        f"Starting document ingestion. Document ID: {document_id}, Job ID: {job_id}"
-    )
+    logger.info(f"Starting document ingestion. Document ID: {document_id}, Job ID: {job_id}")
 
     pipeline = IngestionPipeline()
 
@@ -36,9 +32,7 @@ def process_document_task(self, document_id: str, job_id: str) -> str:
 
     try:
         loop.run_until_complete(pipeline.ingest_document(document_id, job_id))
-        logger.info(
-            f"Document ingestion completed successfully for Document ID: {document_id}"
-        )
+        logger.info(f"Document ingestion completed successfully for Document ID: {document_id}")
         return "SUCCESS"
     except Exception as e:
         logger.error(f"Ingestion failed for Document ID: {document_id}. Error: {e!s}")
@@ -87,9 +81,7 @@ def delete_document_vector_task(document_id: str) -> str:
                 ),
             )
         except Exception as e:
-            logger.warning(
-                f"Failed deleting points from collection '{collection}': {e!s}"
-            )
+            logger.warning(f"Failed deleting points from collection '{collection}': {e!s}")
 
     logger.info(f"Vector deletion complete for Document ID: {document_id}")
     return "SUCCESS"

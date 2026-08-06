@@ -74,9 +74,7 @@ def generate_research_report_task(
                 report_json = result.get("report_json", {})
 
                 # Update report content fields
-                report.title = report_json.get(
-                    "title", f"Legal Research Report - {query[:30]}"
-                )
+                report.title = report_json.get("title", f"Legal Research Report - {query[:30]}")
                 report.executive_summary = report_json.get("executive_summary")
                 report.legal_issues = report_json.get("legal_issues")
                 report.applicable_laws = report_json.get("applicable_laws")

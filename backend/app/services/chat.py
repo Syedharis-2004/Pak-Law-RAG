@@ -144,9 +144,7 @@ class ChatService:
 
             async def run_graph_and_queue():
                 try:
-                    async for event in graph.astream(
-                        inputs, config=config, stream_mode="updates"
-                    ):
+                    async for event in graph.astream(inputs, config=config, stream_mode="updates"):
                         await queue.put(("event", event))
                 except Exception as e:
                     await queue.put(("error", e))
@@ -161,7 +159,6 @@ class ChatService:
                     item_type, data = await asyncio.wait_for(queue.get(), timeout=0.05)
                 except TimeoutError:
                     continue
-
 
                 if item_type == "error":
                     raise data

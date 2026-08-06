@@ -38,9 +38,7 @@ class BGEM3Embedding(BaseEmbedding):
             try:
                 from FlagEmbedding import BGEM3FlagModel
 
-                self._model = BGEM3FlagModel(
-                    self.model_name, use_fp16=True, device=self.device
-                )
+                self._model = BGEM3FlagModel(self.model_name, use_fp16=True, device=self.device)
             except Exception:
                 self._model = None
 
@@ -63,9 +61,9 @@ class BGEM3Embedding(BaseEmbedding):
         """Embed search query (dense vector)."""
         if self._model:
             try:
-                return self._model.encode(
-                    [query], batch_size=self.batch_size, max_length=8192
-                )["dense_vecs"][0].tolist()
+                return self._model.encode([query], batch_size=self.batch_size, max_length=8192)[
+                    "dense_vecs"
+                ][0].tolist()
             except Exception:
                 pass
         return self._hash_vector(query)
@@ -74,9 +72,9 @@ class BGEM3Embedding(BaseEmbedding):
         """Embed document chunk text (dense vector)."""
         if self._model:
             try:
-                return self._model.encode(
-                    [text], batch_size=self.batch_size, max_length=8192
-                )["dense_vecs"][0].tolist()
+                return self._model.encode([text], batch_size=self.batch_size, max_length=8192)[
+                    "dense_vecs"
+                ][0].tolist()
             except Exception:
                 pass
         return self._hash_vector(text)

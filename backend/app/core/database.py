@@ -124,7 +124,6 @@ async def create_tables() -> None:
             await session.rollback()
 
 
-
 async def drop_tables() -> None:
     """Drop all database tables (for testing cleanup)."""
     async with engine.begin() as conn:

@@ -36,7 +36,6 @@ class BaseRepository[ModelType: Base]:
         else:
             raise ValueError("AsyncSession must be provided")
 
-
     async def get(self, id: uuid.UUID) -> ModelType | None:
         """Fetch a record by its UUID."""
         query = select(self.model).where(self.model.id == id)

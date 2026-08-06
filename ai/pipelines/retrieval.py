@@ -135,9 +135,7 @@ class HybridRetriever:
 
     async def _rerank_async(self, nodes: list, query_bundle: Any) -> list:
         """Run BGE cross-encoder reranking in a thread."""
-        return await asyncio.to_thread(
-            self.reranker._postprocess_nodes, nodes, query_bundle
-        )
+        return await asyncio.to_thread(self.reranker._postprocess_nodes, nodes, query_bundle)
 
     async def retrieve(
         self,
@@ -226,9 +224,7 @@ class HybridRetriever:
 
         return reranked_nodes
 
-    def _build_qdrant_filter(
-        self, filters: dict[str, Any] | None
-    ) -> qdrant_models.Filter | None:
+    def _build_qdrant_filter(self, filters: dict[str, Any] | None) -> qdrant_models.Filter | None:
         """Convert basic filter dict to Qdrant Filter conditions."""
         if not filters:
             return None
@@ -241,9 +237,7 @@ class HybridRetriever:
             if isinstance(value, list):
                 # Multiple match condition (OR within the field)
                 must_conditions.append(
-                    qdrant_models.FieldCondition(
-                        key=key, match=qdrant_models.MatchAny(any=value)
-                    )
+                    qdrant_models.FieldCondition(key=key, match=qdrant_models.MatchAny(any=value))
                 )
             else:
                 must_conditions.append(
