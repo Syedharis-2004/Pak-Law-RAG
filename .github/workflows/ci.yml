@@ -183,7 +183,17 @@ jobs:
     if: github.ref == 'refs/heads/main'
     environment: production
     steps:
+      - name: Check deployment secrets
+        id: check_secrets
+        run: |
+          if [ -z "${{ secrets.DEPLOY_HOST }}" ]; then
+            echo "DEPLOY_HOST secret is not set. Skipping SSH deployment."
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
       - name: Deploy via SSH
+        if: steps.check_secrets.outputs.skip != 'true'
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -195,3 +205,4 @@ jobs:
             docker compose pull
             docker compose up -d --no-deps --build
             docker system prune -f
+
