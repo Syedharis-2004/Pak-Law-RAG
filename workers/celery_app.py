@@ -8,8 +8,9 @@ from pathlib import Path
 # Add project root to sys.path so workers can find backend and ai modules
 sys.path.append(str(Path(__file__).parent.parent))
 
-from app.core.config import settings
 from celery import Celery
+
+from app.core.config import settings
 
 celery_app = Celery(
     "paklawai_workers",

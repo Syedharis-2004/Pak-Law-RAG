@@ -58,7 +58,7 @@ class SearchService:
                 search_type=request.search_type,
             )
         except Exception as e:
-            raise RetrievalError(f"Error during vector/keyword search: {str(e)}")
+            raise RetrievalError(f"Error during vector/keyword search: {str(e)}") from e
 
         # 3. Formulate SearchResultItems
         results = []

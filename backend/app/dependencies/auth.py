@@ -43,8 +43,8 @@ async def get_current_user(
         user_id_str = payload.get("sub")
         if not user_id_str:
             raise AuthenticationError("Invalid authentication credentials")
-    except JWTError:
-        raise AuthenticationError("Could not validate credentials")
+    except JWTError as e:
+        raise AuthenticationError("Could not validate credentials") from e
 
     user_id = uuid.UUID(user_id_str)
     user = await user_repo.get_with_roles(user_id)

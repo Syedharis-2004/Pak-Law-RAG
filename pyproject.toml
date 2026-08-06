@@ -1,0 +1,19 @@
+# Root-level pyproject.toml — ruff config for backend/, ai/, and workers/
+# The backend/pyproject.toml handles package metadata; this handles lint from repo root.
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "SIM"]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # do not perform function calls in default arguments
+    "N805",   # first argument of a method should be named 'self'
+    "N818",   # exception name should be named with an Error suffix
+    "BLE001", # do not catch blind exception — intentional in AI fallback/middleware code
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "ai", "workers"]

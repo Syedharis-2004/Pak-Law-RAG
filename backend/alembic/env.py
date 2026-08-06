@@ -14,14 +14,14 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # ── Load models metadata ─────────────────────────────────────
-from app.core.database import Base
+from app.core.database import Base  # noqa: E402
 
 # Import all models to ensure they register on Base.metadata
 
 target_metadata = Base.metadata
 
 # Read sync database URL from env settings
-from app.core.config import settings
+from app.core.config import settings  # noqa: E402
 
 config.set_main_option(
     "sqlalchemy.url", settings.SYNC_DATABASE_URL or settings.DATABASE_URL.replace("+asyncpg", "")

@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 
 
 # ── Base Exception ────────────────────────────────────────────
-class PakLawException(Exception):
+class PakLawException(Exception):  # noqa: N818
     """Base exception for all PakLaw AI application errors."""
 
     def __init__(

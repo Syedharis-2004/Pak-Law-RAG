@@ -7,14 +7,9 @@ and stores vectors in Qdrant and chunks metadata in PostgreSQL.
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pdf2image
-from app.core.config import settings
-from app.core.database import AsyncSessionLocal
-from app.models.document import Document, DocumentStatus
-from app.repositories.document import DocumentRepository
-from app.repositories.mongodb_repo import MongoDBRepository
 from docx import Document as DocxDocument
 from pypdf import PdfReader
 from qdrant_client.http import models as qdrant_models
@@ -23,6 +18,11 @@ from ai.embeddings.bge_m3 import BGEM3Embedding
 from ai.ocr.paddleocr_engine import OCRProcessor
 from ai.qdrant.collections import QdrantCollectionManager
 from ai.utils.text_cleaning import clean_text, extract_sections_from_text
+from app.core.config import settings
+from app.core.database import AsyncSessionLocal
+from app.models.document import Document, DocumentStatus
+from app.repositories.document import DocumentRepository
+from app.repositories.mongodb_repo import MongoDBRepository
 
 
 class IngestionPipeline:
@@ -46,9 +46,9 @@ class IngestionPipeline:
             try:
                 # Update status to processing
                 doc.status = DocumentStatus.PROCESSING
-                doc.processing_started_at = datetime.now(timezone.utc)
+                doc.processing_started_at = datetime.now(UTC)
                 job.status = "running"
-                job.started_at = datetime.now(timezone.utc)
+                job.started_at = datetime.now(UTC)
                 job.progress_percent = 10
                 job.progress_message = "Extracting text from file..."
                 await db.commit()
@@ -65,7 +65,7 @@ class IngestionPipeline:
                     extracted_text = self._extract_docx_content(doc.file_path)
                     pages_data = [{"page_num": 1, "text": extracted_text}]
                 elif file_ext in ("txt", "md", "html"):
-                    with open(doc.file_path, "r", encoding="utf-8") as f:
+                    with open(doc.file_path, encoding="utf-8") as f:
                         extracted_text = f.read()
                     pages_data = [{"page_num": 1, "text": extracted_text}]
                 else:
@@ -174,9 +174,9 @@ class IngestionPipeline:
 
                 # Finalize Job & Document Status
                 doc.status = DocumentStatus.READY
-                doc.processing_completed_at = datetime.now(timezone.utc)
+                doc.processing_completed_at = datetime.now(UTC)
                 job.status = "completed"
-                job.completed_at = datetime.now(timezone.utc)
+                job.completed_at = datetime.now(UTC)
                 job.progress_percent = 100
                 job.progress_message = "Ingestion completed successfully."
                 await db.commit()
@@ -261,7 +261,7 @@ class IngestionPipeline:
                     {"page_num": idx + 1, "text": text, "confidence": confidence}
                 )
         except Exception as e:
-            raise RuntimeError(f"Failed converting or OCRing PDF: {e!s}")
+            raise RuntimeError(f"Failed converting or OCRing PDF: {e!s}") from e
         return pages_data
 
     def _chunk_pages(self, pages_data: list[dict]) -> list[dict]:

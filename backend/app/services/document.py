@@ -5,10 +5,12 @@ Handles document uploading, local storage management, checksum verification,
 deleting, metadata updating, and queuing the ingestion Celery task.
 """
 
+import contextlib
 import hashlib
+import math
 import os
 import uuid
-from datetime import UTC
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import UploadFile
@@ -199,8 +201,6 @@ class DocumentService:
         )
 
         items = [DocumentResponse.from_orm(d) for d in docs]
-        import math
-
         total_pages = math.ceil(total / page_size) if total > 0 else 0
 
         return DocumentListResponse(
@@ -230,19 +230,14 @@ class DocumentService:
             raise NotFoundError("Document", str(doc_id))
 
         # Soft delete in DB
-        from datetime import datetime
-
         doc.is_deleted = True
         doc.deleted_at = datetime.now(UTC)
         doc.status = DocumentStatus.DELETED
         await self.doc_repo.db.flush()
 
         # Delete local file if it exists
-        if os.path.exists(doc.file_path):
-            try:
-                os.remove(doc.file_path)
-            except Exception:
-                pass  # Avoid blocking if file deletion fails
+        with contextlib.suppress(OSError):
+            os.remove(doc.file_path)
 
         # Trigger background task to delete from Qdrant vector store
         from workers.tasks.ingestion import delete_document_vector_task

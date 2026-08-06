@@ -6,13 +6,13 @@ updating the PostgreSQL database.
 """
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
+from celery.utils.log import get_task_logger
 
 from app.core.database import AsyncSessionLocal
 from app.models.research import ReportStatus, ResearchReport
 from app.repositories.research import ResearchRepository
-from celery.utils.log import get_task_logger
-
 from workers.celery_app import celery_app
 
 logger = get_task_logger(__name__)
@@ -103,7 +103,7 @@ def generate_research_report_task(
                 report.pdf_path = pdf_path
                 report.docx_path = docx_path
                 report.status = ReportStatus.COMPLETED
-                report.completed_at = datetime.now(timezone.utc)
+                report.completed_at = datetime.now(UTC)
                 await db.commit()
 
             except Exception as e:

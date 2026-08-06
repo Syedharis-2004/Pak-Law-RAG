@@ -8,11 +8,11 @@ import json
 import logging
 from typing import Any, TypedDict
 
-from app.core.config import settings
 from langchain_groq import ChatGroq
 from langgraph.graph import END, StateGraph
 
 from ai.prompts.research import RESEARCH_SYSTEM_PROMPT
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,6 @@ async def retrieve_laws(state: ResearchState) -> dict:
 
 async def generate_report(state: ResearchState) -> dict:
     """Generate comprehensive structured research report JSON using Groq.
-    
     Uses a single LLM call that produces both the structured JSON and the
     Markdown presentation — halving network round-trips vs. two sequential calls.
     """

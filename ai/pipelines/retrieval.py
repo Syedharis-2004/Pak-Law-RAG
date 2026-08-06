@@ -38,10 +38,9 @@ except Exception:
             self.score = score
 
 
-from app.core.config import settings
-
 from ai.embeddings.bge_m3 import BGEM3Embedding
 from ai.reranker.bge_reranker import BGEReranker
+from app.core.config import settings
 
 
 class HybridRetriever:
@@ -298,7 +297,7 @@ class HybridRetriever:
 
         # Convert back to NodeWithScore objects
         results = []
-        for point_id, data in fused_dict.items():
+        for _point_id, data in fused_dict.items():
             results.append(NodeWithScore(node=data["node"], score=data["score"]))
 
         # Sort by fused score descending

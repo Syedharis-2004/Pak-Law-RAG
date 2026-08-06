@@ -6,6 +6,7 @@ structured reports in PDF, DOCX, or Markdown formats.
 """
 
 import uuid
+from datetime import UTC
 
 from app.core.exceptions import NotFoundError
 from app.models.research import ReportStatus
@@ -87,8 +88,8 @@ class ResearchService:
     ) -> None:
         """Asynchronously executes research report workflow in-process."""
         import asyncio
-        from datetime import datetime, timezone
         import logging
+        from datetime import datetime
 
         from app.core.database import AsyncSessionLocal
         from app.models.research import ReportStatus, ResearchReport
@@ -143,7 +144,7 @@ class ResearchService:
                 report.pdf_path = pdf_path
                 report.docx_path = docx_path
                 report.status = ReportStatus.COMPLETED
-                report.completed_at = datetime.now(timezone.utc)
+                report.completed_at = datetime.now(UTC)
                 await db.commit()
 
             except Exception as e:

@@ -159,7 +159,7 @@ class ChatService:
             while not graph_task.done() or not queue.empty():
                 try:
                     item_type, data = await asyncio.wait_for(queue.get(), timeout=0.05)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     continue
 
 

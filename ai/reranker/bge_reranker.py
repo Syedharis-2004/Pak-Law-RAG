@@ -9,7 +9,7 @@ from typing import Any
 try:
     from llama_index.core.postprocessor.types import BaseNodePostprocessor
     from llama_index.core.schema import NodeWithScore, QueryBundle
-except Exception:
+except ImportError:
     from pydantic import BaseModel
 
     class BaseNodePostprocessor(BaseModel):
@@ -25,8 +25,9 @@ except Exception:
             self.query_str = query_str
 
 
-from app.core.config import settings
 from pydantic import Field, PrivateAttr
+
+from app.core.config import settings
 
 
 class BGEReranker(BaseNodePostprocessor):
@@ -51,7 +52,7 @@ class BGEReranker(BaseNodePostprocessor):
                 self._reranker = FlagReranker(
                     self.model_name, use_fp16=True, device=self.device
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001 — optional GPU model, swallow all load errors
                 self._reranker = None
 
     @classmethod
@@ -78,7 +79,7 @@ class BGEReranker(BaseNodePostprocessor):
                     nodes[idx].score = float(score)
                 sorted_nodes = sorted(nodes, key=lambda x: x.score or 0.0, reverse=True)
                 return sorted_nodes[: self.top_n]
-            except Exception:
+            except Exception:  # noqa: BLE001 — intentional fallback to lexical scoring
                 pass
 
         # Fallback scoring: Lexical keyword overlap

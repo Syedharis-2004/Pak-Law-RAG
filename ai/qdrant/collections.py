@@ -5,11 +5,12 @@ Handles creating, dropping, and configuring collection schemas
 for dense, sparse, and payload metadata fields.
 """
 
-from app.core.config import settings
-from app.core.logging_config import get_logger
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 from qdrant_client.http.exceptions import UnexpectedResponse
+
+from app.core.config import settings
+from app.core.logging_config import get_logger
 
 logger = get_logger("qdrant")
 

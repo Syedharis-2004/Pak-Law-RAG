@@ -13,8 +13,9 @@ except Exception:
         pass
 
 
-from app.core.config import settings
 from pydantic import Field, PrivateAttr
+
+from app.core.config import settings
 
 
 class BGEM3Embedding(BaseEmbedding):

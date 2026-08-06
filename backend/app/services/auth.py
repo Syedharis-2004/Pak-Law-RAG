@@ -5,8 +5,8 @@ Handles user registration, login, JWT token issuance, token refresh,
 and password management.
 """
 
-from datetime import UTC, datetime
 import uuid
+from datetime import UTC, datetime
 
 from jose import JWTError
 
@@ -104,10 +104,8 @@ class AuthService:
             user_id_str = payload.get("sub")
             if not user_id_str:
                 raise AuthenticationError("Invalid refresh token")
-        except JWTError:
-            raise AuthenticationError("Invalid or expired refresh token")
-
-        import uuid
+        except JWTError as e:
+            raise AuthenticationError("Invalid or expired refresh token") from e
 
         user_id = uuid.UUID(user_id_str)
         user = await self.user_repo.get_with_roles(user_id)

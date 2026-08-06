@@ -5,9 +5,10 @@ Integrates PaddleOCR for extracting multilingual text from scanned PDF and image
 """
 
 import numpy as np
+from PIL import Image
+
 from app.core.config import settings
 from app.core.logging_config import get_logger
-from PIL import Image
 
 logger = get_logger("ocr")
 
