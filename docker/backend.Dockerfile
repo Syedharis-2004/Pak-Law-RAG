@@ -51,15 +51,14 @@ RUN uv pip install --system --no-cache \
     qdrant-client==1.12.2 \
     sentence-transformers==3.3.1 \
     FlagEmbedding==1.3.3 \
-    paddlepaddle==2.6.2 \
-    paddleocr==2.9.1 \
     pdf2image==1.17.0 \
     pypdf==5.1.0 \
     python-docx==1.1.2 \
     beautifulsoup4==4.12.3 \
     langdetect==1.0.9 \
     reportlab==4.2.5 \
-    python-pptx==1.0.2
+    python-pptx==1.0.2 \
+    && (pip install paddlepaddle==2.6.2 paddleocr==2.9.1 2>/dev/null || true)
 
 # ── Runtime stage ────────────────────────────────────────────
 FROM python:3.12-slim AS runtime

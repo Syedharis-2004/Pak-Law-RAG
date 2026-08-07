@@ -35,20 +35,16 @@ RUN pip install --no-cache-dir \
     langgraph==0.2.59 \
     llama-index==0.12.0 \
     llama-index-vector-stores-qdrant==0.4.3 \
-    qdrant-client==1.12.2 \
-    sentence-transformers==3.3.1 \
     FlagEmbedding==1.3.3 \
-    paddlepaddle==2.6.2 \
-    paddleocr==2.9.1 \
     pdf2image==1.17.0 \
     pypdf==5.1.0 \
     python-docx==1.1.2 \
     beautifulsoup4==4.12.3 \
     langdetect==1.0.9 \
     reportlab==4.2.5 \
-    python-docx==1.1.2 \
     flower==2.0.1 \
-    httpx==0.28.1
+    httpx==0.28.1 \
+    && (pip install paddlepaddle==2.6.2 paddleocr==2.9.1 2>/dev/null || true)
 
 # Copy source code
 COPY backend/ ./backend/

@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     APP_ENV: str = "development"
     APP_NAME: str = "PakLaw AI"
     APP_VERSION: str = "1.0.0"
-    APP_SECRET_KEY: str
+    APP_SECRET_KEY: str = "paklawai-app-secret-key-change-me-in-production-64-chars"
     DEBUG: bool = False
 
     # ── Server ────────────────────────────────────────────────
@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     BACKEND_WORKERS: int = 4
 
     # ── Database ──────────────────────────────────────────────
-    DATABASE_URL: str
+    DATABASE_URL: str = "sqlite+aiosqlite:///./paklawai_local.db"
     SYNC_DATABASE_URL: str | None = None
     DB_POOL_SIZE: int = 20
     DB_MAX_OVERFLOW: int = 40
@@ -93,7 +93,7 @@ class Settings(BaseSettings):
     RERANKER_TOP_K: int = 10
 
     # ── JWT ───────────────────────────────────────────────────
-    JWT_SECRET_KEY: str
+    JWT_SECRET_KEY: str = "paklawai-jwt-secret-key-change-me-in-production-64-chars"
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
