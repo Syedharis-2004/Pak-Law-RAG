@@ -141,7 +141,7 @@ export default function ResearchHubPage() {
 
   const handleDownload = (format: "pdf" | "docx") => {
     if (!activeReportId) return;
-    const exportUrl = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/research/export`;
+    const exportUrl = `${process.env.NEXT_PUBLIC_API_URL || "https://pak-law-rag.onrender.com"}/api/v1/research/export`;
     
     const form = document.createElement("form");
     form.method = "POST";

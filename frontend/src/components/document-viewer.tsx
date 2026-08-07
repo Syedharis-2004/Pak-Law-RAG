@@ -21,7 +21,7 @@ interface DocumentViewerProps {
   onClose?: () => void;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://pak-law-rag.onrender.com";
 
 export default function DocumentViewer({
   documentId,

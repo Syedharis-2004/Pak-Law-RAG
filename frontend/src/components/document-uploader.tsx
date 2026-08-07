@@ -58,7 +58,7 @@ export default function DocumentUploader({ onUploadComplete }: DocumentUploaderP
       formData.append("file", entry.file);
 
       const xhr = new XMLHttpRequest();
-      xhr.open("POST", `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/documents/upload`);
+      xhr.open("POST", `${process.env.NEXT_PUBLIC_API_URL || "https://pak-law-rag.onrender.com"}/api/v1/documents/upload`);
       if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
 
       xhr.upload.onprogress = (e) => {
