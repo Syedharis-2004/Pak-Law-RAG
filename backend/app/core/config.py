@@ -104,6 +104,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: Annotated[list[str], NoDecode, BeforeValidator(parse_cors)] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "https://pak-law-rag.vercel.app",
     ]
     CORS_ALLOW_CREDENTIALS: bool = True
 
